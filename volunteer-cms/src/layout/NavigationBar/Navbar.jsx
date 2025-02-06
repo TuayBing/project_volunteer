@@ -1,0 +1,279 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  Folder, LogIn, Home, Users, Calendar,
+  UserCircle, Menu, X, LogOut, ChevronDown
+} from 'lucide-react';
+import { useSavedActivities } from './SavedActivitiesContext';
+import SavedActivitiesDropdown from './SavedActivitiesDropdown';
+import NotificationDropdown from './NotificationDropdown';
+
+const Navbar = () => {
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [user, setUser] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const dropdownRef = useRef(null);
+  const navigate = useNavigate();
+
+  const {
+    savedActivities,
+    isDropdownVisible,
+    setIsDropdownVisible,
+    clearActivities
+  } = useSavedActivities();
+
+  useEffect(() => {
+    const loadUser = () => {
+      const storedUser = localStorage.getItem('user');
+      if (storedUser) {
+        const userData = JSON.parse(storedUser);
+        setUser(userData);
+        setIsAdmin(userData.role === 'admin');
+      } else {
+        setUser(null);
+        setIsAdmin(false);
+      }
+    };
+
+    loadUser();
+    window.addEventListener('storage', loadUser);
+
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      window.removeEventListener('storage', loadUser);
+    };
+  }, []);
+
+  const handleLogout = () => {
+    const userRole = user?.role;
+    clearActivities();
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    window.dispatchEvent(new Event('userLogout'));
+    setUser(null);
+    setIsDropdownOpen(false);
+    setIsMobileMenuOpen(false);
+    setIsDropdownVisible(false);
+    navigate(userRole === 'admin' ? '/admin/login' : '/');
+  };
+
+  const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
+  const toggleUserDropdown = () => setIsDropdownOpen(!isDropdownOpen);
+  const isActive = (path) => window.location.pathname === path;
+
+  const ProfileDropdown = () => (
+    <div
+      ref={dropdownRef}
+      className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50"
+    >
+      <div className="py-1">
+        <Link
+          to="/profilesettings"
+          className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
+          onClick={() => {
+            setIsDropdownOpen(false);
+            setIsMobileMenuOpen(false);
+          }}
+        >
+          <UserCircle className="mr-2" size={18} />
+          จัดการโปรไฟล์
+        </Link>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 text-left"
+        >
+          <LogOut className="mr-2" size={18} />
+          ออกจากระบบ
+        </button>
+      </div>
+    </div>
+  );
+
+  if (isAdmin) return null;
+  return (
+    <nav className="w-full bg-white shadow-lg">
+      <div className="max-w-[1920px] mx-auto px-4 lg:px-[140px]">
+        <div className="flex justify-between items-center h-24">
+          {/* Logo */}
+          <div className="flex-shrink-0">
+            <Link to="/" className="flex items-center">
+              <img
+                src="/logo.svg"
+                alt="Logo"
+                className="h-[120px] md:h-[150px] w-auto mt-4 drop-shadow"
+              />
+            </Link>
+          </div>
+
+          {/* Desktop Menu */}
+          <div className="hidden md:flex space-x-4 lg:space-x-8 mx-auto">
+            {[
+              { path: "/", label: "หน้าแรก", icon: Home },
+              { path: "/activity", label: "กิจกรรม", icon: Calendar },
+              { path: "/profile", label: "โปรไฟล์", icon: UserCircle },
+              { path: "/contact", label: "ติดต่อเรา", icon: Users }
+            ].map(({ path, label, icon: Icon }) => (
+              <Link
+                key={path}
+                to={path}
+                className={`text-gray-600 text-sm lg:text-base font-medium px-2 lg:px-3 py-2 rounded-md transition-colors flex items-center ${
+                  isActive(path) ? "border-b-2 border-[#3BB77E] text-[#3BB77E]" : "hover:text-[#3BB77E]"
+                }`}
+              >
+                <Icon className="mr-1" size={20} />
+                {label}
+              </Link>
+            ))}
+          </div>
+
+          {/* Right Side Icons and Buttons */}
+          <div className="hidden md:flex items-center space-x-2 lg:space-x-4">
+            <NotificationDropdown />
+            
+            {/* Saved Activities Folder */}
+            <div className="relative">
+              <button 
+                onMouseEnter={() => setIsDropdownVisible(true)}
+                className="p-2 rounded-full hover:bg-gray-100 shadow-sm relative"
+              >
+                <Folder size={24} className="text-gray-600 hover:text-[#3BB77E]" />
+                {savedActivities.length > 0 && (
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full">
+                    {savedActivities.length}
+                  </span>
+                )}
+              </button>
+              <SavedActivitiesDropdown />
+            </div>
+            
+            {/* User Profile or Login Button */}
+            {user ? (
+              <div className="relative">
+                <button 
+                  onClick={toggleUserDropdown}
+                  className="flex items-center space-x-2 bg-white text-gray-600 px-4 lg:px-6 py-1.5 lg:py-2 text-sm lg:text-base rounded-full hover:bg-gray-100 transition-colors shadow-md"
+                >
+                  <div className="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center">
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
+                  <span>{user.username}</span>
+                  <ChevronDown size={16} />
+                </button>
+                {isDropdownOpen && <ProfileDropdown />}
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                className="bg-[#3BB77E] text-white px-4 lg:px-6 py-1.5 lg:py-2 text-sm lg:text-base rounded-full hover:bg-[#33a96e] transition-colors flex items-center shadow-sm"
+              >
+                <LogIn className="mr-1" size={20} />
+                เข้าสู่ระบบ
+              </Link>
+            )}
+          </div>
+
+          {/* Mobile Menu Button */}
+          <div className="md:hidden">
+            <button
+              onClick={toggleMobileMenu}
+              className="p-2 rounded-md hover:bg-gray-100 focus:outline-none shadow-sm"
+            >
+              {isMobileMenuOpen ? (
+                <X size={24} className="text-gray-600" />
+              ) : (
+                <Menu size={24} className="text-gray-600" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Menu */}
+        <div className={`md:hidden ${isMobileMenuOpen ? "block" : "hidden"}`}>
+          <div className="px-2 pt-2 pb-3 space-y-1 bg-white shadow-lg">
+            <div className="px-3 py-2">
+              <NotificationDropdown />
+            </div>
+            
+            {[
+              { path: "/", label: "หน้าแรก", icon: Home },
+              { path: "/activity", label: "กิจกรรม", icon: Calendar },
+              { path: "/profile", label: "โปรไฟล์", icon: UserCircle },
+              { path: "/contact", label: "ติดต่อเรา", icon: Users }
+            ].map(({ path, label, icon: Icon }) => (
+              <Link
+                key={path}
+                to={path}
+                className={`block px-3 py-2 rounded-md text-base font-medium items-center ${
+                  isActive(path) ? "text-[#3BB77E]" : "text-gray-600 hover:text-[#3BB77E]"
+                }`}
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                <Icon className="mr-2 inline-block" size={20} />
+                {label}
+              </Link>
+            ))}
+
+            {/* Mobile Saved Activities */}
+            {savedActivities.length > 0 && (
+              <div className="px-3 py-2">
+                <button
+                  onClick={() => {
+                    setIsDropdownVisible(true);
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="flex items-center text-gray-600 hover:text-[#3BB77E]"
+                >
+                  <Folder className="mr-2" size={20} />
+                  กิจกรรมที่บันทึก ({savedActivities.length})
+                </button>
+              </div>
+            )}
+
+            {/* Mobile User Profile */}
+            {user && (
+              <div className="px-3 py-2 space-y-2">
+                <div className="flex items-center space-x-2">
+                  <div className="w-10 h-10 rounded-full bg-gray-200 text-gray-600 flex items-center justify-center font-medium">
+                    {user.username.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <span className="text-sm font-medium text-gray-600">{user.username}</span>
+                    <span className="block text-xs text-gray-500">{user.email}</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-2">
+                  <Link
+                    to="/profilesettings"
+                    className="flex items-center justify-center px-3 py-2 bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200 shadow-sm"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <UserCircle className="mr-2" size={20} />
+                    จัดการโปรไฟล์
+                  </Link>
+                  <button 
+                    onClick={handleLogout}
+                    className="flex items-center justify-center px-3 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 shadow-sm"
+                  >
+                    <LogOut className="mr-2" size={20} />
+                    ออกจากระบบ
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </nav>
+  );
+};
+
+export default Navbar;

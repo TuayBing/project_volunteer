@@ -1,0 +1,450 @@
+const { Op } = require('sequelize');
+const sequelize = require('../config/database');
+const { Activity, ActivityCategory } = require('../models/associations');
+const ActivityRegistration = require('../models/activity-registration.model');
+const ActivityInteraction = require('../models/activity_interaction.model');
+const { createActivityNotification } = require('./notification.controller'); 
+const config = require('../config/config');
+
+const DATE_COLUMN = 'created_at';
+const REGISTRATION_DATE = 'registered_at';
+
+const createActivity = async (req, res) => {
+  const t = await sequelize.transaction();
+  try {
+
+
+    const generateId = () => {
+      return Math.random().toString(36).substring(2, 7).toUpperCase();
+    };
+
+    // สร้างข้อมูลสำหรับ activity
+    let activityData = {
+      id: generateId(),
+      ...req.body,
+      image_url: req.file ? `http://localhost:5001/uploads/${req.file.filename}` : null
+    };
+
+  
+
+    // สร้างกิจกรรมใหม่
+    const activity = await Activity.create(activityData, { transaction: t });
+
+    // สร้างการแจ้งเตือน
+    try {
+      await createActivityNotification({
+        id: activity.id,
+        name: activity.name
+      });
+    } catch (notificationError) {
+      console.error('Notification Error:', notificationError);
+    }
+
+    await t.commit();
+
+    res.status(201).json({
+      success: true,
+      data: activity
+    });
+
+  } catch (error) {
+    await t.rollback();
+    console.error('Create activity error:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'เกิดข้อผิดพลาดในการสร้างกิจกรรม'
+    });
+  }
+};
+
+const getAllActivities = async (req, res) => {
+ try {
+   const activities = await Activity.findAll({
+     include: [{
+       model: ActivityCategory,
+       as: 'ActivityCategory',
+       attributes: ['name']
+     }],
+     order: [['createdAt', 'DESC']] 
+   });
+
+   res.json({
+     success: true,
+     data: activities
+   });
+ } catch (error) {
+   console.error('Error in getAllActivities:', error);
+   res.status(500).json({
+     success: false,
+     message: 'เกิดข้อผิดพลาดในการดึงข้อมูลกิจกรรม'
+   });
+ }
+};
+
+const updateActivity = async (req, res) => {
+ const t = await sequelize.transaction();
+ try {
+   const { id } = req.params;
+   const {
+     name, description, hours, month,
+     format, max_attempts, category_id
+   } = req.body;
+
+   const activity = await Activity.findByPk(id);
+   if (!activity) {
+     await t.rollback();
+     return res.status(404).json({
+       success: false,
+       message: 'ไม่พบกิจกรรมที่ต้องการแก้ไข'
+     });
+   }
+
+   let updateData = {
+     name,
+     description, 
+     hours,
+     month,
+     format,
+     max_attempts,
+     category_id
+   };
+
+   if (req.file) {
+     updateData.image_url = `${config.baseURL}/uploads/${req.file.filename}`;
+   }
+
+   await Activity.update(updateData, {
+     where: { id },
+     transaction: t
+   });
+
+   await t.commit();
+
+   res.json({
+     success: true,
+     message: 'แก้ไขกิจกรรมสำเร็จ'
+   });
+
+ } catch (error) {
+   await t.rollback();
+   console.error('Error in updateActivity:', error);
+   res.status(500).json({
+     success: false, 
+     message: 'เกิดข้อผิดพลาดในการแก้ไขกิจกรรม'
+   });
+ }
+};
+
+const deleteActivity = async (req, res) => {
+ const t = await sequelize.transaction();
+ try {
+   const { id } = req.params;
+
+   const activity = await Activity.findByPk(id);
+   if (!activity) {
+     await t.rollback();
+     return res.status(404).json({
+       success: false,
+       message: 'ไม่พบกิจกรรมที่ต้องการลบ'
+     });
+   }
+
+   // ลบข้อมูลจากตาราง activity_registrations ก่อน
+   await ActivityRegistration.destroy({
+     where: { activity_id: id },
+     transaction: t
+   });
+
+   // ลบข้อมูลจากตาราง activity_interactions
+   await ActivityInteraction.destroy({
+     where: { activity_id: id },
+     transaction: t
+   });
+
+   // ลบข้อมูลจากตาราง activities
+   await Activity.destroy({
+     where: { id },
+     transaction: t
+   });
+
+   await t.commit();
+
+   res.json({
+     success: true,
+     message: 'ลบกิจกรรมสำเร็จ'
+   });
+
+ } catch (error) {
+   await t.rollback();
+   console.error('Error in deleteActivity:', error);
+   res.status(500).json({
+     success: false,
+     message: 'เกิดข้อผิดพลาดในการลบกิจกรรม'
+   });
+ }
+};
+
+const getActivityStats = async (req, res) => {
+ try {
+   const { id: activityId } = req.params;
+
+   const activity = await Activity.findByPk(activityId);
+   if (!activity) {
+     return res.status(404).json({
+       success: false,
+       message: 'ไม่พบกิจกรรม'
+     });
+   }
+
+   const [[completedStats], [interestedStats]] = await Promise.all([
+     sequelize.query(
+       `SELECT 
+         s.studentId,
+         s.firstName,
+         s.lastName,
+         s.major_id,
+         ar.registered_at,
+         ar.updated_at
+       FROM activity_registrations ar
+       JOIN users u ON ar.user_id = u.id
+       JOIN student_details s ON u.id = s.user_id
+       WHERE ar.activity_id = :activityId 
+       AND ar.status = 'สำเร็จ'
+       ORDER BY ar.updated_at DESC`,
+       {
+         replacements: { activityId },
+         type: sequelize.QueryTypes.SELECT
+       }
+     ),
+
+     sequelize.query(
+       `SELECT 
+         s.studentId,
+         s.firstName,
+         s.lastName,
+         s.major_id,
+         ar.registered_at,
+         ar.updated_at 
+       FROM activity_registrations ar
+       JOIN users u ON ar.user_id = u.id
+       JOIN student_details s ON u.id = s.user_id
+       WHERE ar.activity_id = :activityId
+       ORDER BY ar.registered_at DESC`,
+       {
+         replacements: { activityId },
+         type: sequelize.QueryTypes.SELECT
+       }
+     )
+   ]);
+
+   res.json({
+     success: true,
+     data: {
+       completed: completedStats || [],
+       interested: interestedStats || []
+     }
+   });
+
+ } catch (error) {
+   console.error('Error in getActivityStats:', error);
+   res.status(500).json({
+     success: false,
+     message: 'ไม่สามารถดึงข้อมูลสถิติกิจกรรมได้'
+   });
+ }
+};
+
+const getDashboardStats = async (req, res) => {
+  try {
+    // คำนวณจำนวนชั่วโมงทั้งหมดและค่าเฉลี่ย
+    const totalHours = await Activity.sum('hours');
+    const totalActivities = await Activity.count();
+    const avgHoursPerActivity = totalHours / totalActivities || 0;
+ 
+    // คำนวณจำนวนผู้เข้าร่วมทั้งหมด
+    const totalParticipants = await ActivityRegistration.count();
+ 
+    // คำนวณกิจกรรมในเดือนนี้
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+ 
+    const currentMonthActivities = await Activity.count({
+      where: {
+        createdAt: {
+          [Op.between]: [firstDayOfMonth, lastDayOfMonth]
+        }
+      }
+    });
+ 
+    // คำนวณกิจกรรมในเดือนที่แล้ว
+    const firstDayOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+    const lastDayOfLastMonth = new Date(today.getFullYear(), today.getMonth(), 0);
+    
+    const lastMonthActivities = await Activity.count({
+      where: {
+        createdAt: {
+          [Op.between]: [firstDayOfLastMonth, lastDayOfLastMonth]
+        }
+      }
+    });
+ 
+    // คำนวณเปอร์เซ็นต์การเปลี่ยนแปลง
+    const activityChangePercent = lastMonthActivities === 0 
+      ? 100 
+      : ((currentMonthActivities - lastMonthActivities) / lastMonthActivities * 100);
+ 
+    // คำนวณอัตราความสำเร็จ
+    const successfulRegistrations = await ActivityRegistration.count({
+      where: { status: 'สำเร็จ' }
+    });
+ 
+    // คำนวณอัตราความสำเร็จเดือนที่แล้ว
+    const lastMonthSuccessful = await ActivityRegistration.count({
+      where: {
+        status: 'สำเร็จ',
+        registered_at: {
+          [Op.between]: [firstDayOfLastMonth, lastDayOfLastMonth]
+        }
+      }
+    });
+ 
+    const lastMonthTotal = await ActivityRegistration.count({
+      where: {
+        registered_at: {
+          [Op.between]: [firstDayOfLastMonth, lastDayOfLastMonth]
+        }
+      }
+    });
+ 
+    const successRate = (successfulRegistrations / totalParticipants * 100) || 0;
+    const lastMonthSuccessRate = (lastMonthSuccessful / lastMonthTotal * 100) || 0;
+    const successRateChange = successRate - lastMonthSuccessRate;
+ 
+    // ข้อมูลกราฟรายเดือน (3 เดือนล่าสุด)
+    const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+    
+    const monthlyStats = await Promise.all(
+      Array.from({ length: 3 }, (_, i) => {
+        const date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+        const firstDay = new Date(date.getFullYear(), date.getMonth(), 1);
+        const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0);
+ 
+        return Promise.all([
+          Activity.count({
+            where: {
+              createdAt: {
+                [Op.between]: [firstDay, lastDay]
+              }
+            }
+          }),
+          ActivityRegistration.count({
+            where: {
+              registered_at: {
+                [Op.between]: [firstDay, lastDay]
+              }
+            }
+          })
+        ]).then(([activityCount, participantCount]) => ({
+          name: months[date.getMonth()],
+          จำนวนกิจกรรม: activityCount,
+          ผู้เข้าร่วม: participantCount
+        }));
+      })
+    );
+ 
+    res.json({
+      success: true,
+      data: {
+        stats: [
+          {
+            title: "จำนวนชั่วโมงทั้งหมด",
+            value: `${totalHours} ชั่วโมง`,
+            subValue: `เฉลี่ย ${avgHoursPerActivity.toFixed(1)} ชั่วโมง/กิจกรรม`,
+            color: "blue"
+          },
+          {
+            title: "ผู้เข้าร่วมทั้งหมด",
+            value: `${totalParticipants} คน`,
+            subValue: `จาก ${totalActivities} กิจกรรม`,
+            color: "green"
+          },
+          {
+            title: "กิจกรรมในเดือนนี้",
+            value: `${currentMonthActivities} กิจกรรม`,
+            subValue: `${activityChangePercent.toFixed(1)}% จากเดือนที่แล้ว`,
+            color: "purple"
+          },
+          {
+            title: "อัตราการเข้าร่วมสำเร็จ",
+            value: `${successRate.toFixed(1)}%`,
+            subValue: `${successRateChange >= 0 ? 'เพิ่มขึ้น' : 'ลดลง'} ${Math.abs(successRateChange).toFixed(1)}% จากเดือนที่แล้ว`,
+            color: "orange"
+          }
+        ],
+        monthlyData: monthlyStats.reverse()
+      }
+    });
+ 
+  } catch (error) {
+    console.error('Error in getDashboardStats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'ไม่สามารถดึงข้อมูลสถิติได้'
+    });
+  }
+ };
+
+const getTopActivities = async (req, res) => {
+  try {
+    // ดึงข้อมูลกิจกรรมทั้งหมดพร้อมจำนวนผู้สนใจและผู้เข้าร่วมสำเร็จ
+    const activities = await Activity.findAll({
+      attributes: [
+        'id',
+        'name',
+        'interested_count',  // จากฟิลด์ที่มีอยู่แล้ว
+        [
+          sequelize.literal(`(
+            SELECT COUNT(*)
+            FROM activity_registrations
+            WHERE activity_registrations.activity_id = Activity.id
+            AND activity_registrations.status = 'สำเร็จ'
+          )`),
+          'completed'
+        ]
+      ],
+      order: [
+        ['interested_count', 'DESC']
+      ],
+      limit: 5
+    });
+
+    const formattedData = activities.map(activity => ({
+      name: activity.name,
+      interested: activity.interested_count,
+      completed: parseInt(activity.dataValues.completed)
+    }));
+
+    res.json({
+      success: true,
+      data: formattedData
+    });
+
+  } catch (error) {
+    console.error('Error in getTopActivities:', error);
+    res.status(500).json({
+      success: false,
+      message: 'ไม่สามารถดึงข้อมูลกิจกรรมยอดนิยมได้'
+    });
+  }
+};
+
+module.exports = {
+  createActivity,
+  getAllActivities,
+  updateActivity,
+  deleteActivity,
+  getActivityStats,
+  getDashboardStats,
+  getTopActivities
+};
