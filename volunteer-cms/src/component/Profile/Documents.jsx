@@ -5,6 +5,7 @@ import { setFiles, setLoading } from '../../store/fileSlice';
 import axios from '../../utils/axios';
 import DeleteFileModal from '../../layout/ProfileModal/DeleteFileModal';
 import UploadSuccessModal from '../../layout/ProfileModal/UploadSuccessModal';
+import { formatFileSize, formatDate } from '../../utils/formatters';
 
 const Documents = () => {
   const dispatch = useDispatch();
@@ -34,7 +35,7 @@ const Documents = () => {
   const handleDelete = async () => {
     try {
       setIsDeleting(true);
-      const response = await axios.delete(`/files/${selectedFile.id}`);
+      const response = await axios.delete(`/deletefile/${selectedFile.id}`);
       if (response.data.success) {
         fetchFiles();
         setShowDeleteModal(false);
@@ -92,6 +93,7 @@ const Documents = () => {
       if (response.data.success) {
         setShowUploadSuccessModal(true);
         fetchFiles();
+        document.getElementById('file-upload').value = '';
       }
     } catch (error) {
       console.error('Upload error:', error);
@@ -117,25 +119,14 @@ const Documents = () => {
     }
   };
 
+  const handleModalClose = () => {
+    setShowUploadSuccessModal(false);
+    document.getElementById('file-upload').value = '';
+  };
+
   useEffect(() => {
     fetchFiles();
   }, []);
-
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-  };
-
-  const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('th-TH', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
 
   return (
     <>
@@ -247,11 +238,12 @@ const Documents = () => {
         onDelete={handleDelete}
         file={selectedFile}
         isDeleting={isDeleting}
+        formatFileSize={formatFileSize}
       />
 
       <UploadSuccessModal
         isOpen={showUploadSuccessModal}
-        onClose={() => setShowUploadSuccessModal(false)}
+        onClose={handleModalClose}
       />
     </>
   );

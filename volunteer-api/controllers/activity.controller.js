@@ -3,6 +3,7 @@ const sequelize = require('../config/database');
 const { Activity, ActivityCategory } = require('../models/associations');
 const ActivityRegistration = require('../models/activity-registration.model');
 const ActivityInteraction = require('../models/activity_interaction.model');
+const PlanActivity = require('../models/planactivity.model');
 const { createActivityNotification } = require('./notification.controller'); 
 const config = require('../config/config');
 
@@ -82,107 +83,138 @@ const getAllActivities = async (req, res) => {
 };
 
 const updateActivity = async (req, res) => {
- const t = await sequelize.transaction();
- try {
-   const { id } = req.params;
-   const {
-     name, description, hours, month,
-     format, max_attempts, category_id
-   } = req.body;
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const {
+      name, description, hours, month,
+      format, max_attempts, category_id
+    } = req.body;
 
-   const activity = await Activity.findByPk(id);
-   if (!activity) {
-     await t.rollback();
-     return res.status(404).json({
-       success: false,
-       message: 'ไม่พบกิจกรรมที่ต้องการแก้ไข'
-     });
-   }
+    // เพิ่มการ validate ข้อมูล
+    if (!name || !hours || !month || !format || !max_attempts || !category_id) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'กรุณากรอกข้อมูลให้ครบถ้วน'
+      });
+    }
 
-   let updateData = {
-     name,
-     description, 
-     hours,
-     month,
-     format,
-     max_attempts,
-     category_id
-   };
+    const activity = await Activity.findByPk(id);
+    if (!activity) {
+      await t.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'ไม่พบกิจกรรมที่ต้องการแก้ไข'
+      });
+    }
 
-   if (req.file) {
-     updateData.image_url = `${config.baseURL}/uploads/${req.file.filename}`;
-   }
+    // แปลงค่าเป็น type ที่ถูกต้อง
+    const updateData = {
+      name,
+      description: description || '',
+      hours: parseInt(hours),
+      month: parseInt(month),
+      format,
+      max_attempts: parseInt(max_attempts),
+      category_id: parseInt(category_id)
+    };
 
-   await Activity.update(updateData, {
-     where: { id },
-     transaction: t
-   });
+    if (req.file) {
+      updateData.image_url = `${config.baseURL}/uploads/${req.file.filename}`;
+    }
 
-   await t.commit();
 
-   res.json({
-     success: true,
-     message: 'แก้ไขกิจกรรมสำเร็จ'
-   });
+    // ใช้ await เพื่อรอการ update เสร็จสิ้น
+    const [updatedRows] = await Activity.update(updateData, {
+      where: { id },
+      transaction: t
+    });
 
- } catch (error) {
-   await t.rollback();
-   console.error('Error in updateActivity:', error);
-   res.status(500).json({
-     success: false, 
-     message: 'เกิดข้อผิดพลาดในการแก้ไขกิจกรรม'
-   });
- }
+    // ตรวจสอบว่ามีการ update จริงหรือไม่
+    if (updatedRows === 0) {
+      await t.rollback();
+      return res.status(400).json({
+        success: false,
+        message: 'ไม่สามารถแก้ไขข้อมูลได้'
+      });
+    }
+
+    // Fetch updated data to verify
+    const updatedActivity = await Activity.findByPk(id, { transaction: t });
+
+    await t.commit();
+    
+    res.json({
+      success: true,
+      message: 'แก้ไขกิจกรรมสำเร็จ',
+      data: updatedActivity // ส่งข้อมูลที่อัพเดทกลับไปด้วย
+    });
+
+  } catch (error) {
+    await t.rollback();
+    console.error('Error in updateActivity:', error);
+    res.status(500).json({
+      success: false,
+      message: 'เกิดข้อผิดพลาดในการแก้ไขกิจกรรม',
+      error: error.message
+    });
+  }
 };
 
 const deleteActivity = async (req, res) => {
- const t = await sequelize.transaction();
- try {
-   const { id } = req.params;
-
-   const activity = await Activity.findByPk(id);
-   if (!activity) {
-     await t.rollback();
-     return res.status(404).json({
-       success: false,
-       message: 'ไม่พบกิจกรรมที่ต้องการลบ'
-     });
-   }
-
-   // ลบข้อมูลจากตาราง activity_registrations ก่อน
-   await ActivityRegistration.destroy({
-     where: { activity_id: id },
-     transaction: t
-   });
-
-   // ลบข้อมูลจากตาราง activity_interactions
-   await ActivityInteraction.destroy({
-     where: { activity_id: id },
-     transaction: t
-   });
-
-   // ลบข้อมูลจากตาราง activities
-   await Activity.destroy({
-     where: { id },
-     transaction: t
-   });
-
-   await t.commit();
-
-   res.json({
-     success: true,
-     message: 'ลบกิจกรรมสำเร็จ'
-   });
-
- } catch (error) {
-   await t.rollback();
-   console.error('Error in deleteActivity:', error);
-   res.status(500).json({
-     success: false,
-     message: 'เกิดข้อผิดพลาดในการลบกิจกรรม'
-   });
- }
-};
+  const t = await sequelize.transaction();
+  try {
+    const { id } = req.params;
+    const activity = await Activity.findByPk(id);
+ 
+    if (!activity) {
+      await t.rollback();
+      return res.status(404).json({
+        success: false,
+        message: 'ไม่พบกิจกรรมที่ต้องการลบ'
+      });
+    }
+ 
+    // ลบข้อมูลจากตาราง plan_activity ก่อน (ถ้ามี)
+    await PlanActivity.destroy({
+      where: { activity_id: id },
+      transaction: t
+    });
+ 
+    // ลบข้อมูลจากตาราง activity_registrations
+    await ActivityRegistration.destroy({
+      where: { activity_id: id },
+      transaction: t
+    });
+ 
+    // ลบข้อมูลจากตาราง activity_interactions 
+    await ActivityInteraction.destroy({
+      where: { activity_id: id },
+      transaction: t
+    });
+ 
+    // ลบข้อมูลจากตาราง activities
+    await Activity.destroy({
+      where: { id },
+      transaction: t
+    });
+ 
+    await t.commit();
+    res.json({
+      success: true,
+      message: 'ลบกิจกรรมสำเร็จ'
+    });
+ 
+  } catch (error) {
+    await t.rollback();
+    console.error('Error in deleteActivity:', error);
+    res.status(500).json({
+      success: false,
+      message: 'เกิดข้อผิดพลาดในการลบกิจกรรม'
+    });
+  }
+ };
 
 const getActivityStats = async (req, res) => {
  try {

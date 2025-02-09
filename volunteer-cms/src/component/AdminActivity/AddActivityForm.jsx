@@ -238,19 +238,30 @@ const handleAddActivity = async (formData) => {
   }
 };
 
- const handleEditActivity = async (formData) => {
-   try {
-     await dispatch(updateActivity({
-       id: selectedActivity.id,
-       ...formData
-     })).unwrap();
-     setIsEditModalOpen(false);
-     setSelectedActivity(null);
-     dispatch(fetchActivities());
-   } catch (error) {
-     console.error('Error editing activity:', error);
-   }
- };
+const handleEditActivity = async (formData) => {
+  try {
+    // Log formData for debugging
+    console.log('FormData before dispatch:', Object.fromEntries(formData.entries()));
+    
+    const result = await dispatch(updateActivity({
+      id: selectedActivity.id,
+      formData  // ส่ง FormData ทั้งก้อน
+    })).unwrap();
+    
+    if (result.success) {
+      setIsEditModalOpen(false);
+      setSelectedActivity(null);
+      // เรียก fetchActivities หลังจากแก้ไขสำเร็จ
+      await dispatch(fetchActivities());
+    } else {
+      console.error('Update failed:', result);
+      alert(result.message || 'เกิดข้อผิดพลาดในการแก้ไขกิจกรรม');
+    }
+  } catch (error) {
+    console.error('Error editing activity:', error);
+    alert(error.response?.data?.message || 'เกิดข้อผิดพลาดในการแก้ไขกิจกรรม');
+  }
+};
 
  const handleDeleteActivity = async () => {
    if (!selectedActivity) return;

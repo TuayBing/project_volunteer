@@ -16,6 +16,8 @@ function EditActivityModal({ isOpen, onClose, onConfirm, isLoading, activity }) 
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState('');
   const [categories, setCategories] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const months = [
     { value: '1', label: 'มกราคม' },
@@ -32,12 +34,13 @@ function EditActivityModal({ isOpen, onClose, onConfirm, isLoading, activity }) 
     { value: '12', label: 'ธันวาคม' }
   ];
 
-  // ดึงข้อมูลหมวดหมู่เมื่อ component โหลด
   useEffect(() => {
-    fetchCategories();
-  }, []);
+    if (isOpen) {
+      fetchCategories();
+      setError('');
+    }
+  }, [isOpen]);
 
-  // ตั้งค่าข้อมูลเริ่มต้นเมื่อมีการเปิด modal และมีข้อมูลกิจกรรม
   useEffect(() => {
     if (activity) {
       setFormData({
@@ -63,6 +66,7 @@ function EditActivityModal({ isOpen, onClose, onConfirm, isLoading, activity }) 
       }
     } catch (error) {
       console.error('Failed to fetch categories:', error);
+      setError('ไม่สามารถดึงข้อมูลหมวดหมู่ได้');
     }
   };
 
@@ -71,29 +75,65 @@ function EditActivityModal({ isOpen, onClose, onConfirm, isLoading, activity }) 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // ตรวจสอบขนาดไฟล์ (5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        setError('ขนาดไฟล์ต้องไม่เกิน 5MB');
+        return;
+      }
+      
       setImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImagePreview(reader.result);
       };
       reader.readAsDataURL(file);
+      setError('');
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    const submitData = new FormData();
-    
-    Object.keys(formData).forEach(key => {
-      submitData.append(key, formData[key]);
-    });
-    
-    if (imageFile) {
-      submitData.append('image', imageFile);
-    }
+    setError('');
+    setSubmitting(true);
 
-    onConfirm(submitData);
+    try {
+      const submitData = new FormData();
+      
+      // Validate required fields
+      if (!formData.name || !formData.hours || !formData.month || !formData.category_id) {
+        setError('กรุณากรอกข้อมูลให้ครบถ้วน');
+        setSubmitting(false);
+        return;
+      }
+
+      // Append all form fields
+      Object.keys(formData).forEach(key => {
+        if (formData[key]) {
+          submitData.append(key, formData[key]);
+        }
+      });
+      
+      if (imageFile) {
+        submitData.append('image', imageFile);
+      }
+
+      const result = await onConfirm(submitData);
+      
+      if (result?.success) {
+        // Reset form
+        setImageFile(null);
+        setImagePreview('');
+        setError('');
+        onClose();
+      } else {
+        setError(result?.message || 'เกิดข้อผิดพลาดในการแก้ไขกิจกรรม');
+      }
+    } catch (error) {
+      console.error('Submit error:', error);
+      setError(error.response?.data?.message || 'เกิดข้อผิดพลาดในการแก้ไขกิจกรรม');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleChange = (e) => {
@@ -102,7 +142,10 @@ function EditActivityModal({ isOpen, onClose, onConfirm, isLoading, activity }) 
       ...prev,
       [name]: value
     }));
+    setError(''); // Clear error when user makes changes
   };
+
+  const isDisabled = isLoading || submitting;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-25 backdrop-blur-sm flex justify-center items-center z-50">
@@ -113,12 +156,18 @@ function EditActivityModal({ isOpen, onClose, onConfirm, isLoading, activity }) 
           </div>
           <button
             onClick={onClose}
-            disabled={isLoading}
+            disabled={isDisabled}
             className="text-gray-400 hover:text-gray-500 transition-colors disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-2 gap-4 mb-6">
@@ -135,7 +184,7 @@ function EditActivityModal({ isOpen, onClose, onConfirm, isLoading, activity }) 
                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3BB77E] focus:border-transparent"
                 placeholder="กรุณากรอกชื่อกิจกรรม"
                 required
-                disabled={isLoading}
+                disabled={isDisabled}
               />
             </div>
 
@@ -150,7 +199,7 @@ function EditActivityModal({ isOpen, onClose, onConfirm, isLoading, activity }) 
                 onChange={handleChange}
                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3BB77E] focus:border-transparent"
                 required
-                disabled={isLoading}
+                disabled={isDisabled}
               >
                 <option value="">เลือกเดือน</option>
                 {months.map(month => (
@@ -174,7 +223,8 @@ function EditActivityModal({ isOpen, onClose, onConfirm, isLoading, activity }) 
                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3BB77E] focus:border-transparent"
                 placeholder="กรุณากรอกจำนวนชั่วโมง"
                 required
-                disabled={isLoading}
+                min="1"
+                disabled={isDisabled}
               />
             </div>
 
@@ -191,8 +241,8 @@ function EditActivityModal({ isOpen, onClose, onConfirm, isLoading, activity }) 
                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3BB77E] focus:border-transparent"
                 placeholder="กรุณากรอกจำนวนครั้งที่ทำได้"
                 required
-                disabled={isLoading}
                 min="1"
+                disabled={isDisabled}
               />
             </div>
 
@@ -206,7 +256,7 @@ function EditActivityModal({ isOpen, onClose, onConfirm, isLoading, activity }) 
                 value={formData.format}
                 onChange={handleChange}
                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3BB77E] focus:border-transparent"
-                disabled={isLoading}
+                disabled={isDisabled}
               >
                 <option value="ออนไลน์">ออนไลน์</option>
                 <option value="ออนไซต์">ออนไซต์</option>
@@ -223,7 +273,7 @@ function EditActivityModal({ isOpen, onClose, onConfirm, isLoading, activity }) 
                 value={formData.category_id}
                 onChange={handleChange}
                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3BB77E] focus:border-transparent"
-                disabled={isLoading}
+                disabled={isDisabled}
                 required
               >
                 <option value="">เลือกหมวดหมู่</option>
@@ -253,10 +303,19 @@ function EditActivityModal({ isOpen, onClose, onConfirm, isLoading, activity }) 
                       className="hidden" 
                       accept="image/*"
                       onChange={handleImageChange}
-                      disabled={isLoading}
+                      disabled={isDisabled}
                     />
                   </label>
                 </div>
+                {imagePreview && (
+                  <div className="w-32 h-32 relative">
+                    <img 
+                      src={imagePreview} 
+                      alt="Preview" 
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                  </div>
+                )}
               </div>
             </div>
 
@@ -272,7 +331,7 @@ function EditActivityModal({ isOpen, onClose, onConfirm, isLoading, activity }) 
                 rows={4}
                 className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#3BB77E] focus:border-transparent"
                 placeholder="กรุณากรอกรายละเอียดกิจกรรม"
-                disabled={isLoading}
+                disabled={isDisabled}
               />
             </div>
           </div>
@@ -281,17 +340,17 @@ function EditActivityModal({ isOpen, onClose, onConfirm, isLoading, activity }) 
             <button
               type="button"
               onClick={onClose}
-              disabled={isLoading}
+              disabled={isDisabled}
               className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               ยกเลิก
             </button>
             <button
               type="submit"
-              disabled={isLoading}
+              disabled={isDisabled}
               className="px-4 py-2 text-sm font-medium text-white bg-[#3BB77E] hover:bg-[#2ea86d] rounded-lg transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? (
+              {submitting ? (
                 <>
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   <span>กำลังบันทึก...</span>

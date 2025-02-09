@@ -8,12 +8,10 @@ import BorrowerDetails from './BorrowerDetails'
 function Home() {
   return (
     <div>
-       <MainLayout>
          <Main />
          <PlanActivity />
          <Volunteernetwork />
          <BorrowerDetails />
-       </MainLayout>
     </div>
   )
 }

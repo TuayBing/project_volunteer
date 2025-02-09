@@ -5,9 +5,7 @@ import ContactForm from './ContactForm'
 function Contact() {
   return (
     <div>
-        <MainLayout>
           <ContactForm />
-        </MainLayout>
     </div>
   )
 }

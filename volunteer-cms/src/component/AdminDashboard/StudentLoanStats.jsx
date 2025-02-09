@@ -120,7 +120,7 @@ const StudentLoanStats = () => {
            />
          </PieChart>
        </ResponsiveContainer>
-     </div>
+     </div> 
    </div>
  );
 };

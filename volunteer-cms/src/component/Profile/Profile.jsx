@@ -17,10 +17,10 @@ function Profile() {
 
   return (
     <div>
-      <MainLayout>
+    
         {token ? <UserProfile /> : null}
         <AuthModal isOpen={showAuthModal} />
-      </MainLayout>
+    
     </div>
   );
 }

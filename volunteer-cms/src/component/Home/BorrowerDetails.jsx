@@ -11,12 +11,16 @@ function BorrowerDetails() {
           className="w-full max-w-md h-auto object-contain transition-transform duration-300 hover:scale-105"
         />
       </div>
+      
       {/* Text Container */}
       <div className="text-left w-full sm:w-full md:w-1/2 lg:w-1/2 xl:w-7/12 max-w-4xl">
-        <h1 className="text-lg md:text-base lg:text-xl leading-relaxed mb-4 sm:mb-6 md:mb-8 font-bold text-black">
+        {/* แก้ไขขนาดหัวข้อให้เท่ากับ PlanActivity */}
+        <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-[#1E1E1E] mb-8">
           ประเภทของผู้กู้ยืมเงิน
         </h1>
-        <div className="space-y-4 sm:space-y-5 md:space-y-6 text-[#4A4A4A]">
+        
+        {/* เพิ่ม mb-8 สำหรับหน้าจอโทรศัพท์ */}
+        <div className="space-y-4 sm:space-y-5 md:space-y-6 text-[#4A4A4A] mb-8">
           <p className="text-sm md:text-base lg:text-lg leading-relaxed">
             <span className="font-semibold text-green-700">ผู้กู้ยืมเงินรายใหม่</span> หมายความว่า
             นักเรียนหรือนักศึกษาผู้ที่ไม่เคยกู้ยืมเงินกองทุนมาก่อน

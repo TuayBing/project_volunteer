@@ -12,45 +12,48 @@ import Setting from './component/SettingProfile/Setting';
 import AdminDashboard from './component/AdminDashboard/AdminDashboard';
 import AdminUser from './component/AdminUsers/AdminUser';
 import AdminActivity from './component/AdminActivity/AdminActivity';
+import HeaderFooterLayout from './layout/NavigationBar/MainLayout';
+
 
 function Router() {
   return (
     <Routes>
       {/* Public Routes */}
-      <Route path="/" element={<Home />} />
-      <Route path="/activity" element={<Activity />} />
-      <Route path="/profile" element={<Profile />} />
-      <Route path="/contact" element={<Contact />} />
+      <Route path="/" element={<HeaderFooterLayout><Home /></HeaderFooterLayout>} />
+      <Route path="/contact" element={<HeaderFooterLayout><Contact /></HeaderFooterLayout>} />
+      <Route path="/activity" element={<HeaderFooterLayout><Activity /></HeaderFooterLayout>} />
+
+      {/* Auth Routes */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot" element={<Forgot />} />
-      <Route path="/profilesettings" element={<Setting />} />
 
-      {/* Protected Admin Routes */}
+      {/* Profile Route - ไม่ใช้ ProtectedRoute */}
+      <Route 
+        path="/profile" 
+        element={
+          <HeaderFooterLayout>
+            <Profile />
+          </HeaderFooterLayout>
+        } 
+      />
+
+      {/* Protected Routes */}
       <Route
-        path="/admin/dashboard"
+        path="/profilesettings"
         element={
           <ProtectedRoute>
-            <AdminDashboard />
+            <HeaderFooterLayout>
+              <Setting />
+            </HeaderFooterLayout>
           </ProtectedRoute>
         }
       />
-      <Route
-        path="/admin/adduser"
-        element={
-          <ProtectedRoute>
-            <AdminUser />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/addactivity"
-        element={
-          <ProtectedRoute>
-            <AdminActivity />
-          </ProtectedRoute>
-        }
-      />
+
+      {/* Admin Routes */}
+      <Route path="/admin/dashboard" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/admin/adduser" element={<ProtectedRoute><AdminUser /></ProtectedRoute>} />
+      <Route path="/admin/addactivity" element={<ProtectedRoute><AdminActivity /></ProtectedRoute>} />
     </Routes>
   );
 }

@@ -2,11 +2,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   Folder, LogIn, Home, Users, Calendar,
-  UserCircle, Menu, X, LogOut, ChevronDown
+  UserCircle, Menu, X, LogOut, ChevronDown,
+  LayoutDashboard
 } from 'lucide-react';
 import { useSavedActivities } from './SavedActivitiesContext';
 import SavedActivitiesDropdown from './SavedActivitiesDropdown';
 import NotificationDropdown from './NotificationDropdown';
+import { useAuth } from '../../component/AuthContext';
 
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -15,6 +17,7 @@ const Navbar = () => {
   const [isAdmin, setIsAdmin] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   const {
     savedActivities,
@@ -26,19 +29,22 @@ const Navbar = () => {
   useEffect(() => {
     const loadUser = () => {
       const storedUser = localStorage.getItem('user');
-      if (storedUser) {
-        const userData = JSON.parse(storedUser);
-        setUser(userData);
-        setIsAdmin(userData.role === 'admin');
-      } else {
+      const storedToken = localStorage.getItem('token');
+      
+      if (!storedUser || !storedToken) {
         setUser(null);
         setIsAdmin(false);
+        return;
       }
+      
+      const userData = JSON.parse(storedUser);
+      setUser(userData);
+      setIsAdmin(['admin', 'superadmin'].includes(userData.role));
     };
 
     loadUser();
     window.addEventListener('storage', loadUser);
-
+    
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsDropdownOpen(false);
@@ -53,52 +59,190 @@ const Navbar = () => {
     };
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     const userRole = user?.role;
-    clearActivities();
-    localStorage.removeItem('user');
     localStorage.removeItem('token');
-    window.dispatchEvent(new Event('userLogout'));
+    localStorage.removeItem('user');
+    clearActivities();
+    await logout();
     setUser(null);
     setIsDropdownOpen(false);
     setIsMobileMenuOpen(false);
     setIsDropdownVisible(false);
-    navigate(userRole === 'admin' ? '/admin/login' : '/');
+    
+    if (['admin', 'superadmin'].includes(userRole)) {
+      navigate('/admin/login');
+    } else {
+      navigate('/');
+    }
   };
 
   const toggleMobileMenu = () => setIsMobileMenuOpen(!isMobileMenuOpen);
   const toggleUserDropdown = () => setIsDropdownOpen(!isDropdownOpen);
   const isActive = (path) => window.location.pathname === path;
-
   const ProfileDropdown = () => (
     <div
       ref={dropdownRef}
-      className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50"
+      className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 py-2"
     >
-      <div className="py-1">
+      {isAdmin && (
         <Link
-          to="/profilesettings"
+          to="/admin/dashboard"
           className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
           onClick={() => {
             setIsDropdownOpen(false);
             setIsMobileMenuOpen(false);
           }}
         >
-          <UserCircle className="mr-2" size={18} />
-          จัดการโปรไฟล์
+          <LayoutDashboard className="mr-2" size={18} />
+          หน้าควบคุม
         </Link>
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 text-left"
-        >
-          <LogOut className="mr-2" size={18} />
-          ออกจากระบบ
-        </button>
-      </div>
+      )}
+
+      <Link
+        to="/profilesettings"
+        className="flex items-center px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
+        onClick={() => {
+          setIsDropdownOpen(false);
+          setIsMobileMenuOpen(false);
+        }}
+      >
+        <UserCircle className="mr-2" size={18} />
+        จัดการโปรไฟล์
+      </Link>
+
+      <button
+        onClick={handleLogout}
+        className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 text-left"
+      >
+        <LogOut className="mr-2" size={18} />
+        ออกจากระบบ
+      </button>
     </div>
   );
 
-  if (isAdmin) return null;
+    // ส่วนของ Navbar สำหรับ Admin
+    if (isAdmin) {
+      return (
+        <nav className="w-full bg-white shadow-lg">
+          <div className="max-w-[1920px] mx-auto px-4 lg:px-[140px]">
+            <div className="flex justify-between items-center h-16">
+              {/* Logo */}
+              <Link to="/" className="flex-shrink-0">
+                <img
+                  src="/logo.svg"
+                  alt="Logo"
+                 className="h-[120px] md:h-[150px] w-auto mt-4 drop-shadow"
+                />
+              </Link>
+
+              {/* Right Side */}
+              <div className="flex items-center space-x-4">
+                {/* Main Menu - Hidden on Mobile */}
+                <div className="hidden md:flex items-center space-x-4">
+                  <Link
+                    to="/"
+                    className={`flex items-center px-4 py-2 text-gray-600 hover:text-[#3BB77E] transition-colors ${
+                      isActive("/") ? "text-[#3BB77E]" : ""
+                    }`}
+                  >
+                    <Home className="w-5 h-5 mr-2" />
+                    <span>หน้าแรก</span>
+                  </Link>
+                  <Link
+                    to="/activity"
+                    className={`flex items-center px-4 py-2 text-gray-600 hover:text-[#3BB77E] transition-colors ${
+                      isActive("/activity") ? "text-[#3BB77E]" : ""
+                    }`}
+                  >
+                    <Calendar className="w-5 h-5 mr-2" />
+                    <span>กิจกรรม</span>
+                  </Link>
+                  <Link
+                    to="/admin/dashboard"
+                    className="flex items-center px-4 py-2 text-gray-600 hover:text-[#3BB77E] transition-colors"
+                  >
+                    <LayoutDashboard className="w-5 h-5 mr-2" />
+                    <span>หน้าควบคุม</span>
+                  </Link>
+                </div>
+
+                {/* User Profile */}
+                <div className="relative">
+                  <button 
+                    onClick={toggleUserDropdown}
+                    className="flex items-center space-x-2 bg-white text-gray-600 px-4 py-2 rounded-full hover:bg-gray-100 transition-colors"
+                  >
+                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                      {user?.username?.charAt(0).toUpperCase()}
+                    </div>
+                    <span className="hidden md:block">{user?.username}</span>
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                  {isDropdownOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg z-50 py-2">
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-gray-100 text-left"
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        ออกจากระบบ
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Mobile Menu Button */}
+                <button
+                  onClick={toggleMobileMenu}
+                  className="md:hidden p-2 rounded-md hover:bg-gray-100"
+                >
+                  {isMobileMenuOpen ? (
+                    <X className="w-6 h-6 text-gray-600" />
+                  ) : (
+                    <Menu className="w-6 h-6 text-gray-600" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* Mobile Menu */}
+            {isMobileMenuOpen && (
+              <div className="md:hidden">
+                <div className="px-2 pt-2 pb-3 space-y-1">
+                  <Link
+                    to="/"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-[#3BB77E] hover:bg-gray-100"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <Home className="w-5 h-5 mr-2 inline-block" />
+                    หน้าแรก
+                  </Link>
+                  <Link
+                    to="/activity"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-[#3BB77E] hover:bg-gray-100"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <Calendar className="w-5 h-5 mr-2 inline-block" />
+                    กิจกรรม
+                  </Link>
+                  <Link
+                    to="/admin/dashboard"
+                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-600 hover:text-[#3BB77E] hover:bg-gray-100"
+                    onClick={() => setIsMobileMenuOpen(false)}
+                  >
+                    <LayoutDashboard className="w-5 h-5 mr-2 inline-block" />
+                    หน้าควบคุม
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+        </nav>
+      );
+    }
+
+  // ส่วนของ Navbar สำหรับ User ปกติ
   return (
     <nav className="w-full bg-white shadow-lg">
       <div className="max-w-[1920px] mx-auto px-4 lg:px-[140px]">
@@ -198,7 +342,7 @@ const Navbar = () => {
 
         {/* Mobile Menu */}
         <div className={`md:hidden ${isMobileMenuOpen ? "block" : "hidden"}`}>
-          <div className="px-2 pt-2 pb-3 space-y-1 bg-white shadow-lg">
+          <div className="px-2 pt-2 pb-3 space-y-1 bg-white shadow-lg rounded-lg">
             <div className="px-3 py-2">
               <NotificationDropdown />
             </div>
@@ -212,12 +356,12 @@ const Navbar = () => {
               <Link
                 key={path}
                 to={path}
-                className={`block px-3 py-2 rounded-md text-base font-medium items-center ${
+                className={`flex items-center px-3 py-2 rounded-md text-base font-medium ${
                   isActive(path) ? "text-[#3BB77E]" : "text-gray-600 hover:text-[#3BB77E]"
                 }`}
                 onClick={() => setIsMobileMenuOpen(false)}
               >
-                <Icon className="mr-2 inline-block" size={20} />
+                <Icon className="mr-2" size={20} />
                 {label}
               </Link>
             ))}
@@ -251,6 +395,16 @@ const Navbar = () => {
                   </div>
                 </div>
                 <div className="grid grid-cols-1 gap-2">
+                  {isAdmin && (
+                    <Link
+                      to="/admin/dashboard"
+                      className="flex items-center justify-center px-3 py-2 bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200 shadow-sm"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                    >
+                      <LayoutDashboard className="mr-2" size={20} />
+                      หน้าควบคุม
+                    </Link>
+                  )}
                   <Link
                     to="/profilesettings"
                     className="flex items-center justify-center px-3 py-2 bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200 shadow-sm"
@@ -261,7 +415,7 @@ const Navbar = () => {
                   </Link>
                   <button 
                     onClick={handleLogout}
-                    className="flex items-center justify-center px-3 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 shadow-sm"
+                    className="flex items-center justify-center px-3 py-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 shadow-sm w-full"
                   >
                     <LogOut className="mr-2" size={20} />
                     ออกจากระบบ

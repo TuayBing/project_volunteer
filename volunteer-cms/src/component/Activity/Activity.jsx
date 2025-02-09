@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import MainLayout from '../../layout/NavigationBar/MainLayout';
 import ActivityList from './ActivityList';
 
 function Activity() {
@@ -7,9 +6,7 @@ function Activity() {
 
   return (
     <div>
-      <MainLayout>
             <ActivityList />
-      </MainLayout>
     </div>
   );
 }

@@ -6,36 +6,119 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token'));
   const [user, setUser] = useState(JSON.parse(localStorage.getItem('user')));
 
-  // เก็บ token ลง localStorage เมื่อมีการเปลี่ยนแปลง
+  // เพิ่มฟังก์ชันตรวจสอบ token (คงไว้เหมือนเดิม)
+  const isValidToken = (token) => {
+    if (!token) return false;
+    try {
+      const parts = token.split('.');
+      if (parts.length !== 3) return false;
+      const payload = JSON.parse(atob(parts[1]));
+      if (payload.exp && payload.exp * 1000 < Date.now()) return false;
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  // ตรวจสอบ token เมื่อ component mount (คงไว้เหมือนเดิม)
   useEffect(() => {
-    if (token) {
+    const storedToken = localStorage.getItem('token');
+    if (!isValidToken(storedToken)) {
+      logout();
+    }
+  }, []);
+
+  // auto logout effect (คงไว้เหมือนเดิม)
+  useEffect(() => {
+    let inactivityTimer;
+    const resetTimer = () => {
+      if (inactivityTimer) clearTimeout(inactivityTimer);
+      if (token && isValidToken(token)) {
+        inactivityTimer = setTimeout(() => {
+          logout();
+          window.location.href = '/login';
+        }, 10 * 60 * 1000);
+      }
+    };
+
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    const handleActivity = () => {
+      resetTimer();
+    };
+
+    events.forEach(event => {
+      document.addEventListener(event, handleActivity);
+    });
+
+    const handleUnload = () => {
+      logout();
+    };
+    
+    window.addEventListener('beforeunload', handleUnload);
+    resetTimer();
+
+    return () => {
+      clearTimeout(inactivityTimer);
+      events.forEach(event => {
+        document.removeEventListener(event, handleActivity);
+      });
+      window.removeEventListener('beforeunload', handleUnload);
+    };
+  }, [token]);
+
+  // localStorage effects (คงไว้เหมือนเดิม)
+  useEffect(() => {
+    if (token && isValidToken(token)) {
       localStorage.setItem('token', token);
     } else {
       localStorage.removeItem('token');
+      if (token) setToken(null);
     }
   }, [token]);
 
-  // เก็บข้อมูล user ลง localStorage เมื่อมีการเปลี่ยนแปลง
   useEffect(() => {
-    if (user) {
+    if (user && token && isValidToken(token)) {
       localStorage.setItem('user', JSON.stringify(user));
     } else {
       localStorage.removeItem('user');
+      if (user) setUser(null);
     }
-  }, [user]);
+  }, [user, token]);
 
+  // แก้ไขฟังก์ชัน login
   const login = (userData, userToken) => {
+    // Save to localStorage first
+    localStorage.setItem('token', userToken);
+    localStorage.setItem('user', JSON.stringify(userData));
+    
+    // Then update state
     setUser(userData);
     setToken(userToken);
   };
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
+  // logout function (คงไว้เหมือนเดิม)
+  const logout = async () => {
+    try {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      setToken(null);
+      setUser(null);
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  };
+
+  const value = {
+    token,
+    user,
+    login,
+    logout,
+    isValidToken,
+    isAuthenticated: !!(token && isValidToken(token) && user)
   };
 
   return (
-    <AuthContext.Provider value={{ token, user, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
@@ -48,3 +131,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+export default AuthContext;
