@@ -105,8 +105,10 @@ const ActivityLog = () => {
       <div className="p-5">
         {/* Header Section */}
         <div className="flex justify-between items-start gap-4 mb-4">
-          <h4 className="text-lg font-medium text-gray-900">
-            {registration?.activity?.name}
+        <h4 className="text-lg font-medium text-gray-900 whitespace-nowrap">
+            {registration?.activity?.name?.length > 40 
+              ? `${registration.activity.name.substring(0, 40)}...` 
+              : registration?.activity?.name}
           </h4>
           <div className="flex items-center gap-2">
             {/* Status Badge */}

@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ตรวจสอบ token เมื่อ component mount (คงไว้เหมือนเดิม)
+  // ตรวจสอบ token เมื่อ component mount
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
     if (!isValidToken(storedToken)) {
@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // auto logout effect (คงไว้เหมือนเดิม)
+  // auto logout effect 
   useEffect(() => {
     let inactivityTimer;
     const resetTimer = () => {
@@ -66,7 +66,7 @@ export const AuthProvider = ({ children }) => {
     };
   }, [token]);
 
-  // localStorage effects (คงไว้เหมือนเดิม)
+  // localStorage effects 
   useEffect(() => {
     if (token && isValidToken(token)) {
       localStorage.setItem('token', token);
@@ -96,7 +96,7 @@ export const AuthProvider = ({ children }) => {
     setToken(userToken);
   };
 
-  // logout function (คงไว้เหมือนเดิม)
+  // logout function 
   const logout = async () => {
     try {
       localStorage.removeItem('token');

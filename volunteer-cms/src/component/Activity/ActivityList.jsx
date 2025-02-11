@@ -13,7 +13,7 @@ const ActivityList = () => {
  const [currentPage, setCurrentPage] = useState(1);
  const [searchTerm, setSearchTerm] = useState('');
  const [showCalendar, setShowCalendar] = useState(false);
- const itemsPerPage = 6;
+ const itemsPerPage = 12;
 
  useEffect(() => {
    fetchActivities();

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import api from '../../utils/axios';
 import { useAuth } from '../AuthContext';
 
 const BoxLoginForm = () => {
- const { login } = useAuth(); // เพิ่ม useAuth hook
+ const { login } = useAuth();
  const [showPassword, setShowPassword] = useState(false);
  const [formData, setFormData] = useState({
    email: '',
@@ -20,45 +20,49 @@ const BoxLoginForm = () => {
      ...formData,
      [e.target.name]: e.target.value,
    });
-   // Clear error when user starts typing
    if (error) setError('');
  };
 
  const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError('');
-  setIsLoading(true);
+   e.preventDefault();
+   setError('');
+   setIsLoading(true);
 
-  try {
-    const response = await api.post('/auth/login', formData);
-    
-    if (response.data.success) {
-      // Store in localStorage first
-      localStorage.setItem('token', response.data.token);
-      localStorage.setItem('user', JSON.stringify(response.data.user));
-      
-      // Then update AuthContext
-      login(response.data.user, response.data.token);
-      
-      // Redirect based on user role
-      const userRole = response.data.user.role.toLowerCase();
-      if (userRole === 'superadmin' || userRole === 'admin') {
-        navigate('/admin/dashboard');
-      } else {
-        navigate('/');
-      }
-    }
-  } catch (err) {
-    console.log('Login Error:', err); // เพิ่ม debug log
-    setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
-  } finally {
-    setIsLoading(false);
-  }
-};
+   try {
+     const response = await api.post('/auth/login', formData);
+     
+     if (response.data.success) {
+       localStorage.setItem('token', response.data.token);
+       localStorage.setItem('user', JSON.stringify(response.data.user));
+       login(response.data.user, response.data.token);
+       
+       const userRole = response.data.user.role.toLowerCase();
+       if (userRole === 'superadmin' || userRole === 'admin') {
+         navigate('/admin/dashboard');
+       } else {
+         navigate('/');
+       }
+     }
+   } catch (err) {
+     console.log('Login Error:', err);
+     setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+   } finally {
+     setIsLoading(false);
+   }
+ };
 
  return (
    <div className="flex items-center justify-center min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-     <div className="bg-white shadow-lg rounded-lg w-full max-w-4xl p-8 flex flex-col md:flex-row">
+     <div className="bg-white shadow-lg rounded-lg w-full max-w-4xl p-8 flex flex-col md:flex-row relative">
+       {/* Back Button */}
+       <button
+         onClick={() => navigate('/')}
+         className="absolute top-4 left-4 text-gray-600 hover:text-gray-800 flex items-center gap-1"
+       >
+         <ArrowLeft className="w-5 h-5" />
+         <span>ย้อนกลับ</span>
+       </button>
+
        {/* Left side - Image */}
        <div className="md:w-1/2 flex items-center justify-center mb-6 md:mb-0">
          <img
@@ -72,7 +76,6 @@ const BoxLoginForm = () => {
        <div className="md:w-1/2 flex flex-col justify-center md:pl-8">
          <h1 className="text-2xl font-bold text-center mb-6">ลงชื่อเข้าใช้</h1>
          
-         {/* Error Message */}
          {error && (
            <div className="bg-red-50 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
              <span className="block sm:inline">{error}</span>
@@ -80,7 +83,6 @@ const BoxLoginForm = () => {
          )}
 
          <form onSubmit={handleSubmit} className="space-y-4">
-           {/* Email Field */}
            <div>
              <label className="block text-sm font-medium text-gray-700">
                อีเมล
@@ -97,7 +99,6 @@ const BoxLoginForm = () => {
              />
            </div>
 
-           {/* Password Field */}
            <div>
              <label className="block text-sm font-medium text-gray-700">
                รหัสผ่าน
@@ -123,16 +124,12 @@ const BoxLoginForm = () => {
                </button>
              </div>
              <div className="mt-1 text-right">
-               <Link 
-                 to="/forgot" 
-                 className="text-sm text-emerald-500 hover:text-emerald-600"
-               >
+               <Link to="/forgot" className="text-sm text-emerald-500 hover:text-emerald-600">
                  ลืมรหัสผ่าน?
                </Link>
              </div>
            </div>
 
-           {/* Submit Button */}
            <button
              type="submit"
              className={`w-full rounded-md bg-emerald-500 py-2 text-sm font-medium text-white transition duration-200
@@ -142,13 +139,9 @@ const BoxLoginForm = () => {
              {isLoading ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบ'}
            </button>
 
-           {/* Register Link */}
            <div className="mt-4 text-center text-sm">
              ยังไม่มีบัญชี?{' '}
-             <Link 
-               to="/register" 
-               className="text-emerald-500 hover:text-emerald-600"
-             >
+             <Link to="/register" className="text-emerald-500 hover:text-emerald-600">
                สมัครสมาชิก
              </Link>
            </div>

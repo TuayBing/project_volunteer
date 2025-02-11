@@ -53,8 +53,8 @@ app.use(cookieParser());
 
 // Rate limiting
 const limiter = rateLimit({
- windowMs: 15 * 60 * 1000,
- max: 100,
+ windowMs: 100 * 60 * 1000,
+ max: 1000,
  message: {
    success: false,
    message: 'คำขอมากเกินไป กรุณาลองใหม่ในภายหลัง'

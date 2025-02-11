@@ -9,69 +9,68 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const createActivityNotification = async (activityData) => {
- const t = await sequelize.transaction();
- try {
-   // Validate input data
-   if (!activityData?.id || !activityData?.name) {
-  
-     await t.rollback();
-     return null;
-   }
+  const t = await sequelize.transaction();
+  try {
+    if (!activityData?.id || !activityData?.name) {
+      await t.rollback();
+      return null;
+    }
 
-   // Find active users
-   const users = await User.findAll({
-     where: { 
-       role: 'user',
-       isActive: true 
-     },
-     transaction: t
-   });
+    // ดึงเฉพาะ user ids ก่อน
+    const userIds = await User.findAll({
+      attributes: ['id'],
+      where: { 
+        role: 'user',
+        isActive: true 
+      },
+      raw: true
+    });
 
-   if (!users || users.length === 0) {
-   
-     await t.rollback();
-     return null;
-   }
+    if (!userIds.length) {
+      await t.rollback();
+      return null;
+    }
 
-   // Create notifications for each user
-   const notifications = await Promise.all(
-     users.map(user => 
-       Notification.create({
-         user_id: user.id,
-         title: 'มีกิจกรรมใหม่',
-         message: `กิจกรรมใหม่: ${activityData.name}`,
-         type: 'new_activity',
-         reference_id: activityData.id,
-         is_read: 0,
-       }, { transaction: t })
-     )
-   );
+    // Batch insert notifications
+    const notificationData = userIds.map(user => ({
+      user_id: user.id,
+      title: 'มีกิจกรรมใหม่',
+      message: `กิจกรรมใหม่: ${activityData.name}`,
+      type: 'new_activity',
+      reference_id: activityData.id,
+      is_read: 0,
+    }));
 
-   // Send socket notifications
-   const io = getIO();
-   if (io) {
-     users.forEach(user => {
-       const userNotification = notifications.find(n => n.user_id === user.id);
-       if (userNotification) {
-         io.to(`user_${user.id}`).emit('newNotification', userNotification);
-       }
-     });
-   } else {
-     console.warn('Socket instance not available');
-   }
+    const notifications = await Notification.bulkCreate(notificationData, { 
+      transaction: t 
+    });
 
-   await t.commit();
-   return notifications;
+    await t.commit();
 
- } catch (error) {
-   await t.rollback();
-   console.error('Notification creation error:', {
-     message: error.message,
-     stack: error.stack,
-     data: activityData
-   });
-   return null;
- }
+    // ส่ง WebSocket notifications แยกออกมา
+    process.nextTick(() => {
+      const io = getIO();
+      if (io) {
+        userIds.forEach(user => {
+          const userNotification = notifications.find(n => n.user_id === user.id);
+          if (userNotification) {
+            io.to(`user_${user.id}`).emit('newNotification', userNotification);
+          }
+        });
+      }
+    });
+
+    return notifications;
+
+  } catch (error) {
+    await t.rollback();
+    console.error('Notification creation error:', {
+      message: error.message,
+      stack: error.stack,
+      data: activityData
+    });
+    return null;
+  }
 };
 
 const getUserNotifications = async (req, res) => {
@@ -165,7 +164,7 @@ const markAsRead = async (req, res) => {
      message: 'เกิดข้อผิดพลาดในการอัพเดทสถานะการอ่าน'
    });
  }
-};
+}; 
 
 const markAllAsRead = async (req, res) => {
  const t = await sequelize.transaction();

@@ -13,39 +13,36 @@ const REGISTRATION_DATE = 'registered_at';
 const createActivity = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-
-
     const generateId = () => {
       return Math.random().toString(36).substring(2, 7).toUpperCase();
     };
 
-    // สร้างข้อมูลสำหรับ activity
     let activityData = {
       id: generateId(),
       ...req.body,
       image_url: req.file ? `http://localhost:5001/uploads/${req.file.filename}` : null
     };
 
-  
-
     // สร้างกิจกรรมใหม่
     const activity = await Activity.create(activityData, { transaction: t });
-
-    // สร้างการแจ้งเตือน
-    try {
-      await createActivityNotification({
-        id: activity.id,
-        name: activity.name
-      });
-    } catch (notificationError) {
-      console.error('Notification Error:', notificationError);
-    }
-
     await t.commit();
 
+    // ส่ง response กลับก่อน
     res.status(201).json({
       success: true,
       data: activity
+    });
+
+    // สร้าง notification แยกออกมา
+    process.nextTick(async () => {
+      try {
+        await createActivityNotification({
+          id: activity.id,
+          name: activity.name
+        });
+      } catch (notificationError) {
+        console.error('Notification Error:', notificationError);
+      }
     });
 
   } catch (error) {
