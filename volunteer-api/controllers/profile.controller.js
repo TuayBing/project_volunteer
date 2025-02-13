@@ -37,17 +37,21 @@ const profileController = {
     const t = await sequelize.transaction();
     try {
       const { activities } = req.body;
-   
-      
+  
+      // ตรวจสอบว่ามี activities ส่งมาหรือไม่
+      if (!activities || !Array.isArray(activities) || activities.length === 0) {
+        throw new Error('Invalid activities data');
+      }
+  
       // ตรวจสอบการลงทะเบียนซ้ำ
       const existingRegistrations = await ActivityRegistration.findAll({
         where: {
           user_id: req.userId,
-          activity_id: activities.map(a => a.id)
+          activity_id: activities.map(a => a.activity_id) // เปลี่ยนจาก a.id เป็น a.activity_id
         },
         transaction: t
       });
-
+  
       if (existingRegistrations.length > 0) {
         await t.rollback();
         return res.status(400).json({
@@ -55,31 +59,34 @@ const profileController = {
           message: 'มีกิจกรรมที่ลงทะเบียนไปแล้ว'
         });
       }
-
+  
       // บันทึกการลงทะเบียน
-      await ActivityRegistration.bulkCreate(
+      const registrations = await ActivityRegistration.bulkCreate(
         activities.map(activity => ({
-          user_id: req.userId,  // ใช้ req.userId จาก middleware
-          activity_id: activity.activity_id,  // ใช้ activity_id โดยตรง
+          user_id: req.userId,
+          activity_id: activity.activity_id, // ใช้ activity_id
           status: 'กำลังดำเนินการ',
           registered_at: new Date()
         })),
         { transaction: t }
       );
-
-      // อัพเดท interested_count
+  
+      // อัพเดท interested_count สำหรับแต่ละกิจกรรม
+      const activityIds = activities.map(a => a.activity_id);
       await Activity.increment('interested_count', {
         by: 1,
-        where: { id: activities.map(a => a.id) },
+        where: {
+          id: activityIds
+        },
         transaction: t
       });
-
+  
       await t.commit();
-
       res.json({
         success: true,
         message: 'ลงทะเบียนกิจกรรมสำเร็จ'
       });
+  
     } catch (error) {
       await t.rollback();
       console.error('Error in registerActivities:', error);
@@ -148,7 +155,7 @@ const profileController = {
     const t = await sequelize.transaction();
     try {
       const { activityId } = req.params;
-
+  
       // ตรวจสอบว่ามีการลงทะเบียนอยู่หรือไม่
       const registration = await ActivityRegistration.findOne({
         where: {
@@ -161,7 +168,7 @@ const profileController = {
         }],
         transaction: t
       });
-
+  
       if (!registration) {
         await t.rollback();
         return res.status(404).json({
@@ -169,30 +176,16 @@ const profileController = {
           message: 'ไม่พบข้อมูลการลงทะเบียนกิจกรรม'
         });
       }
-
-      // ถ้าสถานะเป็น 'สำเร็จ' ให้ลด completed_count ลง 1
-      if (registration.status === 'สำเร็จ') {
-        await Activity.decrement('completed_count', {
-          where: { id: activityId },
-          transaction: t
-        });
-      }
-
-      // ลด interested_count ลง 1
-      await Activity.decrement('interested_count', {
-        where: { id: activityId },
-        transaction: t
-      });
-
+  
       // ลบการลงทะเบียน
       await registration.destroy({ transaction: t });
-
+  
       await t.commit();
       res.json({
         success: true,
         message: 'ลบการลงทะเบียนกิจกรรมสำเร็จ'
       });
-
+  
     } catch (error) {
       await t.rollback();
       console.error('Error in deleteActivity:', error);
@@ -202,6 +195,7 @@ const profileController = {
       });
     }
   }
+  
 };
-
+ 
 module.exports = profileController;

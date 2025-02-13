@@ -64,7 +64,7 @@ const SavedActivitiesDropdown = () => {
          </svg>
          กิจกรรมที่เตรียมบันทึก {savedActivities.length > 0 && `(${savedActivities.length})`}
        </h3>
-     </div>
+     </div> 
 
      {/* Content */}
      <div className="max-h-96 overflow-y-auto">
