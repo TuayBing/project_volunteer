@@ -11,7 +11,7 @@ const validateEmail = (email) => {
   const re = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
   return re.test(email);
 };
-
+ 
 const sanitizeInput = (input) => {
   return input ? input.trim() : null;
 };
@@ -23,11 +23,11 @@ const getUserProfile = async (req, res) => {
       include: [{
         model: StudentDetails,
         include: [
-          { 
+          {
             model: Faculty,
             attributes: ['id', 'name']
           },
-          { 
+          {
             model: Major,
             attributes: ['id', 'name']
           }
@@ -42,11 +42,14 @@ const getUserProfile = async (req, res) => {
       });
     }
 
+    // สร้างเบอร์โทรในรูปแบบ xxx-xxx-1234 (ถ้าเบอร์เป็น 0891231234)
+    const maskedPhoneNumber = `xxx-xxx-${user.lastThreeDigits}`;
+
     const userData = {
       id: user.id,
       username: user.username,
       email: user.email,
-      phoneNumber: user.phoneNumber,
+      phoneNumber: maskedPhoneNumber,  // แสดงเบอร์ในรูปแบบที่กำหนด
       role: user.role,
       firstName: user.StudentDetail?.firstName ?? "",
       lastName: user.StudentDetail?.lastName ?? "",
@@ -476,3 +479,4 @@ module.exports = {
   getLoanStats,
   updateTotalHours  
 };
+ 

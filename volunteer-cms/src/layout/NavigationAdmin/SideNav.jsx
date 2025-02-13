@@ -18,7 +18,7 @@ const SideNav = () => {
     await logout();
     const userRole = user?.role;
     if (userRole === 'admin') {
-      navigate('/admin/login');
+      navigate('/login');
     } else {
       navigate('/login');
     }

@@ -58,53 +58,62 @@ const checkExisting = async (req, res) => {
 
 // Register new user
 const register = async (req, res) => {
- try {
-   const errors = validationResult(req);
-   if (!errors.isEmpty()) {
-     return res.status(400).json({
-       success: false,
-       errors: errors.array()
-     });
-   }
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        errors: errors.array()
+      });
+    }
 
-   const { username, email, password, phoneNumber } = req.body;
-   
-   const existingUser = await User.findOne({
-     where: {
-       [Op.or]: [{ email }, { username }]
-     }
-   });
+    const { username, email, password, phoneNumber } = req.body;
 
-   if (existingUser) {
-     return res.status(400).json({
-       success: false,
-       message: existingUser.email === email ? 
-         'อีเมลนี้ถูกใช้ไปแล้ว' : 
-         'ชื่อผู้ใช้นี้ถูกใช้ไปแล้ว'
-     });
-   }
+    // ตรวจสอบผู้ใช้ที่มีอยู่
+    const existingUser = await User.findOne({
+      where: {
+        [Op.or]: [{ email }, { username }]
+      }
+    });
 
-   const salt = await bcrypt.genSalt(12);
-   const hashedPassword = await bcrypt.hash(password, salt);
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: existingUser.email === email ?
+          'อีเมลนี้ถูกใช้ไปแล้ว' :
+          'ชื่อผู้ใช้นี้ถูกใช้ไปแล้ว'
+      });
+    }
 
-   await User.create({
-     username,
-     email,
-     password: hashedPassword,
-     phoneNumber
-   });
+    // สร้าง salt และเข้ารหัสรหัสผ่านและเบอร์โทร
+    const salt = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(password, salt);
+    const hashedPhoneNumber = await bcrypt.hash(phoneNumber, salt);
 
-   res.status(201).json({
-     success: true,
-     message: 'ลงทะเบียนสำเร็จ'
-   });
- } catch (error) {
-   console.error('Registration error:', error);
-   res.status(500).json({
-     success: false,
-     message: 'เกิดข้อผิดพลาดในการลงทะเบียน'
-   });
- }
+    // เก็บ 3 ตัวท้ายของเบอร์โทร
+    const lastThreeDigits = phoneNumber.slice(-3);
+
+    // สร้างผู้ใช้ใหม่
+    await User.create({
+      username,
+      email,
+      password: hashedPassword,
+      phoneNumber: hashedPhoneNumber,
+      lastThreeDigits
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'ลงทะเบียนสำเร็จ'
+    });
+
+  } catch (error) {
+    console.error('Registration error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'เกิดข้อผิดพลาดในการลงทะเบียน'
+    });
+  }
 };
 
 
@@ -149,9 +158,9 @@ const login = async (req, res) => {
      success: true,
      token,
      user: {
-       id: user.id,
+      //  id: user.id,
        username: user.username,
-       email: user.email,
+      //  email: user.email,
        role: user.role
      }
    });

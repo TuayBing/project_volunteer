@@ -22,7 +22,11 @@ const User = sequelize.define('User', {
     allowNull: false
   },
   phoneNumber: {
-    type: DataTypes.STRING(10),
+    type: DataTypes.STRING(60),  // เปลี่ยนเป็น 60 เพื่อรองรับ bcrypt hash
+    allowNull: false
+  },
+  lastThreeDigits: {  // เพิ่มคอลัมน์ใหม่สำหรับเก็บ 3 ตัวท้าย
+    type: DataTypes.STRING(3),
     allowNull: false
   },
   role: {
