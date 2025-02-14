@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const { Op } = require('sequelize');
 const otpGenerator = require('otp-generator');
 const nodemailer = require('nodemailer');
+const LoginLog = require('../models/loginLog.model');
 
 // Configure mail transporter
 const transporter = nodemailer.createTransport({
@@ -119,59 +120,140 @@ const register = async (req, res) => {
 
 // Login user
 const login = async (req, res) => {
- try {
-   const { email, password } = req.body;
-
-   const user = await User.findOne({ 
-     where: { email } 
-   });
-
-   if (!user) {
-     return res.status(401).json({
-       success: false,
-       message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
-     });
-   }
-
-   const isMatch = await bcrypt.compare(password, user.password);
-   if (!isMatch) {
-     return res.status(401).json({
-       success: false,
-       message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
-     });
-   }
-
-   const token = jwt.sign(
-     { id: user.id, role: user.role },
-     process.env.JWT_SECRET,
-     { expiresIn: '1d' }
-   );
-
-   res.cookie('token', token, {
-     httpOnly: true,
-     secure: process.env.NODE_ENV === 'production',
-     sameSite: 'strict',
-     maxAge: 24 * 60 * 60 * 1000 // 1 day
-   });
-
-   res.json({
-     success: true,
-     token,
-     user: {
-      //  id: user.id,
-       username: user.username,
-      //  email: user.email,
-       role: user.role
-     }
-   });
- } catch (error) {
-   console.error('Login error:', error);
-   res.status(500).json({
-     success: false,
-     message: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ'
-   });
- }
-};
+  try {
+    const { email, password } = req.body;
+    
+    // ข้อมูลสำหรับ log
+    const logData = {
+      email,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent']
+    };
+ 
+    const user = await User.findOne({ where: { email } });
+ 
+    // กรณีไม่พบผู้ใช้
+    if (!user) {
+      await LoginLog.create({
+        ...logData,
+        status: 'failed',
+        failReason: 'User not found'
+      });
+      return res.status(401).json({
+        success: false,
+        message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
+      });
+    }
+ 
+    // กรณีบัญชีถูกล็อค
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      await LoginLog.create({
+        ...logData,
+        userId: user.id,
+        status: 'locked',
+        failReason: 'Account locked'
+      });
+      return res.status(423).json({
+        success: false,
+        message: 'บัญชีถูกระงับชั่วคราว กรุณาลองใหม่ภายหลัง'
+      });
+    }
+ 
+    const isMatch = await bcrypt.compare(password, user.password);
+    
+    // กรณีรหัสผ่านไม่ถูกต้อง
+    if (!isMatch) {
+      await user.increment('failedAttempts');
+      
+      let failReason = 'Invalid password';
+      if (user.failedAttempts >= 5) {
+        await user.update({
+          lockedUntil: new Date(Date.now() + 15 * 60 * 1000)
+        });
+        failReason = 'Account locked due to multiple failures';
+      }
+ 
+      await LoginLog.create({
+        ...logData,
+        userId: user.id,
+        status: 'failed',
+        failReason
+      });
+ 
+      return res.status(401).json({
+        success: false,
+        message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
+      });
+    }
+ 
+    // กรณี login สำเร็จ
+    await user.update({
+      failedAttempts: 0,
+      lockedUntil: null,
+      lastLogin: new Date()  // อัพเดทเวลา login ล่าสุด
+    });
+ 
+    await LoginLog.create({
+      ...logData,
+      userId: user.id,
+      status: 'success'
+    });
+ 
+    const token = jwt.sign(
+      {
+        id: user.id,
+        role: user.role,
+        iat: Math.floor(Date.now() / 1000)
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '1d' }
+    );
+ 
+    // เพิ่ม security headers
+    res.set({
+      'X-Frame-Options': 'DENY',
+      'X-Content-Type-Options': 'nosniff',
+      'X-XSS-Protection': '1; mode=block',
+      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
+    });
+ 
+    res.cookie('token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 * 1000,
+      path: '/',
+      domain: process.env.COOKIE_DOMAIN || undefined,
+      signed: true
+    });
+ 
+    // ส่งข้อมูลกลับ
+    res.json({
+      success: true,
+      token,
+      user: {
+        username: user.username,
+        role: user.role
+      }
+    });
+ 
+  } catch (error) {
+    console.error('Login error:', error);
+    
+    await LoginLog.create({
+      email: req.body.email || '',
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+      status: 'error',
+      failReason: error.message
+    });
+ 
+    res.status(500).json({
+      success: false,
+      message: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ'
+    });
+  }
+ };
 
 // Send OTP email
 const sendOTPEmail = async (email, otp) => {

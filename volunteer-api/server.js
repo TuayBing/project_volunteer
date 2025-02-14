@@ -30,6 +30,9 @@ const notificationRoutes = require('./routes/notification.routes');
 const app = express();
 const server = http.createServer(app);
 
+const COOKIE_SECRET = process.env.COOKIE_SECRET || 'your-secret-key-123';
+app.use(cookieParser(COOKIE_SECRET));
+
 // Import and initialize socket.io
 const { initSocket } = require('./config/socket');
 initSocket(server);

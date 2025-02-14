@@ -80,19 +80,28 @@ const NotificationDropdown = React.forwardRef(function NotificationDropdown(prop
  };
 
  const fetchNotifications = async () => {
-   try {
-     setIsLoading(true);
-     const response = await api.get('/notifications');
-     if (response.data.success) {
-       setNotifications(response.data.data);
-       setUnreadCount(response.data.data.filter(n => !n.is_read).length);
-     }
-   } catch (error) {
-     console.error('Error fetching notifications:', error);
-   } finally {
-     setIsLoading(false);
-   }
- };
+  // เช็คก่อนว่ามี token ไหม
+  const token = localStorage.getItem('token');
+  if (!token) {
+    setNotifications([]);
+    setUnreadCount(0);
+    return; // ไม่ทำ request ถ้าไม่มี token
+  }
+
+  try {
+    setIsLoading(true);
+    const response = await api.get('/notifications');
+    if (response.data.success) {
+      setNotifications(response.data.data);
+      setUnreadCount(response.data.data.filter(n => !n.is_read).length);
+    }
+  } catch (error) {
+    setNotifications([]);
+    setUnreadCount(0);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
  const handleRead = async (id) => {
    try {

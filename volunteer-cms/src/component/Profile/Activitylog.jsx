@@ -111,23 +111,28 @@ const ActivityLog = () => {
               : registration?.activity?.name}
           </h4>
           <div className="flex items-center gap-2">
-            {/* Status Badge */}
-            <div
-              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium
-                ${registration?.status === 'สำเร็จ' || registration?.status === 'ยกเลิก'
-                  ? 'opacity-80'
-                  : 'cursor-pointer hover:opacity-90'
-                } ${getStatusStyle(registration?.status)}`}
-              onClick={() => {
-                if (registration?.status !== 'สำเร็จ' && registration?.status !== 'ยกเลิก') {
-                  setSelectedActivity(registration);
-                  setIsStatusDialogOpen(true);
-                }
-              }}
-            >
-              {getStatusIcon(registration?.status)}
-              <span>{registration?.status}</span>
-            </div>
+          
+           {/* Status Badge */}
+          <div
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium
+              ${registration?.status === 'สำเร็จ' || registration?.status === 'ยกเลิก'
+                ? 'opacity-80'
+                : 'cursor-pointer hover:opacity-90 hover:bg-opacity-80'
+              } ${getStatusStyle(registration?.status)}`}
+            onClick={() => {
+              if (registration?.status !== 'สำเร็จ' && registration?.status !== 'ยกเลิก') {
+                setSelectedActivity(registration);
+                setIsStatusDialogOpen(true);
+              }
+            }}
+          >
+            {getStatusIcon(registration?.status)}
+            <span>{registration?.status}</span>
+            {registration?.status !== 'สำเร็จ' && registration?.status !== 'ยกเลิก' && (
+              <ChevronDown className="w-4 h-4 transition-transform" />
+            )}
+          </div>
+
             {/* Delete Button */}
             <button
               onClick={() => {

@@ -16,7 +16,22 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    // เงียบๆ ไม่ต้อง log error
+    return Promise.reject({
+      message: 'กรุณาเข้าสู่ระบบใหม่'
+    });
+  }
+);
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    // เงียบๆ ไม่ต้อง log error
+    return Promise.reject({
+      message: 'กรุณาเข้าสู่ระบบใหม่'
+    });
+  }
 );
 
 export default api;
