@@ -8,7 +8,7 @@ const ActivityStatusModal = ({
   type = 'alreadyPrepared' 
 }) => {
   if (!isOpen) return null;
-
+ 
   const modalConfig = {
     alreadyPrepared: {
       icon: <Archive className="w-6 h-6 text-red-600" />,

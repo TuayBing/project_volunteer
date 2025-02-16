@@ -4,6 +4,7 @@ const multer = require('multer');
 const activityController = require('../controllers/activity.controller');
 const { verifyToken, verifyAdmin } = require('../middleware/auth.middleware');
 
+// Multer configuration
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, 'uploads/')
@@ -15,6 +16,18 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({ storage: storage });
+
+// Route สำหรับตรวจสอบจำนวนครั้งที่ user ทำกิจกรรม (ใส่ไว้ก่อน route ที่มี parameter)
+router.get('/activities/check/:activityId',
+  verifyToken,
+  activityController.checkUserAttempts
+);
+
+// ดึง top 5 activities (ย้ายขึ้นมาก่อน route ที่มี parameter)
+router.get('/activities/top-activities',
+  verifyToken,
+  activityController.getTopActivities
+);
 
 // สร้างกิจกรรมใหม่
 router.post('/activities',
@@ -50,16 +63,15 @@ router.get('/activities/:id/stats',
   activityController.getActivityStats
 );
 
-// เพิ่ม route สำหรับดึงข้อมูล dashboard
+// ดึงข้อมูล dashboard
 router.get('/dashboard-stats',
   verifyToken,
   activityController.getDashboardStats
 );
 
-// เพิ่ม route ใหม่สำหรับดึง top 5 activities
-router.get('/activities/top-activities',
+router.get('/activities/available/:userId',
   verifyToken,
-  activityController.getTopActivities
+  activityController.getAvailableActivities
 );
 
 module.exports = router;

@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useSavedActivities } from '../../layout/NavigationBar/SavedActivitiesContext';
 import { useAuth } from '../AuthContext';
-import api from '../../utils/axios';
 import { Link } from 'react-router-dom';
 import ActivityStatusModal from '../../layout/ActivityModal/ActivityStatusModal';
+import api from '../../utils/axios';
 
 const ActivityCard = ({ activity, isAuthenticated }) => {
   const { saveActivity, savedActivities, removeSavedActivity } = useSavedActivities();
@@ -11,8 +11,6 @@ const ActivityCard = ({ activity, isAuthenticated }) => {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
   const [isHovered, setIsHovered] = useState(false);
-  
-  // เพิ่ม state สำหรับ modal
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [modalType, setModalType] = useState('alreadyPrepared');
 
@@ -21,45 +19,51 @@ const ActivityCard = ({ activity, isAuthenticated }) => {
   const truncateText = (text, maxLength = 80) => {
     if (!text) return '';
     return text.length <= maxLength ? text : text.slice(0, maxLength) + '...';
-  };
+  }; 
 
   const handlePrepare = async () => {
     if (!token) return;
-
-    // เช็คว่าเคยทำครบตามจำนวนครั้งที่กำหนดหรือยัง
-    if (activity.completed_count >= activity.max_attempts) {
-      setModalType('maxAttemptsReached');
-      setShowStatusModal(true);
-      return;
-    }
-
-    // เช็คว่าเตรียมบันทึกไว้แล้วหรือยัง
-    if (isPrepared) {
-      setModalType('alreadyPrepared');
-      setShowStatusModal(true);
-      return;
-    }
-
-    if (!isPrepared) {
-      try {
-        setIsSaving(true);
-        setError(null);
-        saveActivity({
-          id: activity.id,
-          name: activity.name,
-          format: activity.format,
-          hours: activity.hours,
-          image_url: activity.image_url,
-          description: activity.description,
-          max_attempts: activity.max_attempts,
-          completed_count: activity.completed_count,
-          ActivityCategory: activity.ActivityCategory
-        });
-      } catch (err) {
-        setError('เกิดข้อผิดพลาดในการบันทึกกิจกรรม');
-      } finally {
-        setIsSaving(false);
+  
+    try {
+      setIsSaving(true);
+      setError(null);
+  
+      // เช็คว่าเตรียมบันทึกไว้แล้วหรือยัง ต้องเช็คก่อน API call
+      if (isPrepared) {
+        setModalType('alreadyPrepared');
+        setShowStatusModal(true);
+        return;
       }
+  
+      // เช็คกับ server ว่า user ทำกิจกรรมนี้ได้อีกไหม
+      const response = await api.get(`/activities/check/${activity.id}`);
+      const { attempts, max_attempts, canRegister } = response.data.data;
+  
+      // ถ้าทำครบแล้ว
+      if (!canRegister) {
+        setModalType('maxAttemptsReached');
+        setShowStatusModal(true);
+        return;
+      }
+  
+      // ถ้ายังไม่เคยบันทึก และยังทำได้
+      saveActivity({
+        id: activity.id,
+        name: activity.name,
+        format: activity.format,
+        hours: activity.hours,
+        image_url: activity.image_url,
+        description: activity.description,
+        max_attempts,
+        current_attempts: attempts,
+        ActivityCategory: activity.ActivityCategory
+      });
+      
+    } catch (err) {
+      console.error('Error checking activity attempts:', err);
+      setError('เกิดข้อผิดพลาดในการตรวจสอบสถานะกิจกรรม');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -76,7 +80,6 @@ const ActivityCard = ({ activity, isAuthenticated }) => {
       setIsSaving(false);
     }
   };
-
   return (
     <>
       <div
@@ -113,6 +116,14 @@ const ActivityCard = ({ activity, isAuthenticated }) => {
           <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3 line-clamp-2">
             {truncateText(activity.description)}
           </p>
+
+          {/* ข้อจำกัดจำนวนครั้ง */}
+          <div className="text-xs text-gray-500 mb-2">
+            {activity.max_attempts > 1 ? 
+              `สามารถทำได้สูงสุด ${activity.max_attempts} ครั้ง` : 
+              'สามารถทำได้เพียงครั้งเดียว'
+            }
+          </div>
 
           {error && (
             <div className="mb-2 sm:mb-3 px-2 sm:px-3 py-1.5 sm:py-2 bg-red-50 text-red-600 text-xs sm:text-sm rounded-md">

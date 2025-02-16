@@ -1,4 +1,5 @@
 const User = require('../models/user.model');
+const LoginLog = require('../models/loginLog.model');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { validationResult } = require('express-validator');
@@ -6,7 +7,6 @@ const rateLimit = require('express-rate-limit');
 const { Op } = require('sequelize');
 const otpGenerator = require('otp-generator');
 const nodemailer = require('nodemailer');
-const LoginLog = require('../models/loginLog.model');
 
 // Configure mail transporter
 const transporter = nodemailer.createTransport({
@@ -122,17 +122,31 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    
-    // ข้อมูลสำหรับ log
+    const user = await User.findOne({
+      where: { email }
+    });
+
+    // สร้างข้อมูลพื้นฐานสำหรับ log
     const logData = {
       email,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent']
     };
- 
-    const user = await User.findOne({ where: { email } });
- 
-    // กรณีไม่พบผู้ใช้
+
+    // เช็คการล็อคบัญชี
+    if (user && user.lockedUntil && user.lockedUntil > new Date()) {
+      await LoginLog.create({
+        ...logData,
+        userId: user.id,
+        status: 'locked',
+        failReason: 'Account temporarily locked'
+      });
+      return res.status(423).json({
+        success: false,
+        message: 'บัญชีถูกระงับชั่วคราว กรุณาลองใหม่ภายหลัง'
+      });
+    }
+
     if (!user) {
       await LoginLog.create({
         ...logData,
@@ -144,61 +158,45 @@ const login = async (req, res) => {
         message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
       });
     }
- 
-    // กรณีบัญชีถูกล็อค
-    if (user.lockedUntil && user.lockedUntil > new Date()) {
-      await LoginLog.create({
-        ...logData,
-        userId: user.id,
-        status: 'locked',
-        failReason: 'Account locked'
-      });
-      return res.status(423).json({
-        success: false,
-        message: 'บัญชีถูกระงับชั่วคราว กรุณาลองใหม่ภายหลัง'
-      });
-    }
- 
+
     const isMatch = await bcrypt.compare(password, user.password);
-    
-    // กรณีรหัสผ่านไม่ถูกต้อง
     if (!isMatch) {
       await user.increment('failedAttempts');
       
-      let failReason = 'Invalid password';
+      // ล็อคบัญชีถ้า login ผิดเกิน 5 ครั้ง
       if (user.failedAttempts >= 5) {
         await user.update({
-          lockedUntil: new Date(Date.now() + 15 * 60 * 1000)
+          lockedUntil: new Date(Date.now() + 15 * 60 * 1000) // ล็อค 15 นาที
         });
-        failReason = 'Account locked due to multiple failures';
+        await LoginLog.create({
+          ...logData,
+          userId: user.id,
+          status: 'locked',
+          failReason: 'Account locked due to multiple failed attempts'
+        });
+      } else {
+        await LoginLog.create({
+          ...logData,
+          userId: user.id,
+          status: 'failed',
+          failReason: 'Invalid password'
+        });
       }
- 
-      await LoginLog.create({
-        ...logData,
-        userId: user.id,
-        status: 'failed',
-        failReason
-      });
- 
+
       return res.status(401).json({
         success: false,
         message: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'
       });
     }
- 
-    // กรณี login สำเร็จ
-    await user.update({
-      failedAttempts: 0,
-      lockedUntil: null,
-      lastLogin: new Date()  // อัพเดทเวลา login ล่าสุด
-    });
- 
-    await LoginLog.create({
-      ...logData,
-      userId: user.id,
-      status: 'success'
-    });
- 
+
+    // รีเซ็ตจำนวนครั้งที่ login ผิดเมื่อ login สำเร็จ
+    if (user.failedAttempts > 0) {
+      await user.update({
+        failedAttempts: 0,
+        lockedUntil: null
+      });
+    }
+
     const token = jwt.sign(
       {
         id: user.id,
@@ -208,26 +206,28 @@ const login = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: '1d' }
     );
- 
+
+    // บันทึก log เมื่อ login สำเร็จ
+    await LoginLog.create({
+      ...logData,
+      userId: user.id,
+      status: 'success'
+    });
+
     // เพิ่ม security headers
     res.set({
       'X-Frame-Options': 'DENY',
       'X-Content-Type-Options': 'nosniff',
-      'X-XSS-Protection': '1; mode=block',
-      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains'
+      'X-XSS-Protection': '1; mode=block'
     });
- 
+
     res.cookie('token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 24 * 60 * 60 * 1000,
-      path: '/',
-      domain: process.env.COOKIE_DOMAIN || undefined,
-      signed: true
+      maxAge: 24 * 60 * 60 * 1000
     });
- 
-    // ส่งข้อมูลกลับ
+
     res.json({
       success: true,
       token,
@@ -236,24 +236,24 @@ const login = async (req, res) => {
         role: user.role
       }
     });
- 
+
   } catch (error) {
     console.error('Login error:', error);
-    
+    // บันทึก log กรณีเกิด error
     await LoginLog.create({
-      email: req.body.email || '',
+      email: req.body.email,
       ipAddress: req.ip,
       userAgent: req.headers['user-agent'],
       status: 'error',
       failReason: error.message
     });
- 
+
     res.status(500).json({
       success: false,
       message: 'เกิดข้อผิดพลาดในการเข้าสู่ระบบ'
     });
   }
- };
+};
 
 // Send OTP email
 const sendOTPEmail = async (email, otp) => {

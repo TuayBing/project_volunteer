@@ -26,6 +26,7 @@ const activityRoutes = require('./routes/activity.routes');
 const profileRoutes = require('./routes/profile.routes');
 const planactivityRoutes = require('./routes/planctivity.routes');
 const notificationRoutes = require('./routes/notification.routes');
+const contactRoutes = require('./routes/contact.routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -95,6 +96,7 @@ app.use('/api', activityRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/', planactivityRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/contact', contactRoutes);
 
 // ตั้งค่าโฟลเดอร์สำหรับไฟล์
 const setupUploadDirectories = () => {

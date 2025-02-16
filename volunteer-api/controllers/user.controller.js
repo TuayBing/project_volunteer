@@ -49,7 +49,7 @@ const getUserProfile = async (req, res) => {
       id: user.id,
       username: user.username,
       email: user.email,
-      phoneNumber: maskedPhoneNumber,  // แสดงเบอร์ในรูปแบบที่กำหนด
+      phoneNumber: maskedPhoneNumber,  
       role: user.role,
       firstName: user.StudentDetail?.firstName ?? "",
       lastName: user.StudentDetail?.lastName ?? "",

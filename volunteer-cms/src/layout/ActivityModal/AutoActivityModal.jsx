@@ -27,7 +27,13 @@ const AutoActivityModal = ({ isOpen, onClose }) => {
 
   const fetchActivities = async () => {
     try {
-      const response = await api.get('/activities');
+      const user = JSON.parse(localStorage.getItem('user'));
+      if (!user) {
+        toast.error('กรุณาเข้าสู่ระบบก่อน');
+        return;
+      }
+
+      const response = await api.get(`/activities/available/${user.id}`);
       if (response.data.success) {
         setAllActivities(response.data.data);
       }
@@ -89,9 +95,10 @@ const AutoActivityModal = ({ isOpen, onClose }) => {
     }
   };
 
-  const generateActivities = () => {
+  const generateActivities = async () => {
     setIsLoading(true);
     try {
+      // 1. กรองตามเงื่อนไขที่เลือก
       const filtered = allActivities.filter(activity => {
         const matchFormat = activity.format === (locationType === 'online' ? 'ออนไลน์' : 'ออนไซต์');
         
@@ -116,6 +123,7 @@ const AutoActivityModal = ({ isOpen, onClose }) => {
         return matchFormat && matchMonth;
       });
 
+      // 2. เรียงตามจำนวนชั่วโมง
       const sortedActivities = filtered.sort((a, b) => 
         parseInt(a.hours) - parseInt(b.hours)
       );
@@ -123,7 +131,7 @@ const AutoActivityModal = ({ isOpen, onClose }) => {
       const targetHours = parseInt(hours);
       let currentHours = 0;
       const selectedActivities = [];
-
+      // 3. เลือกกิจกรรมจนกว่าจะครบชั่วโมง
       for (const activity of sortedActivities) {
         if (currentHours < targetHours) {
           selectedActivities.push(activity);
@@ -132,8 +140,15 @@ const AutoActivityModal = ({ isOpen, onClose }) => {
         if (currentHours >= targetHours) break;
       }
 
-      if (currentHours < targetHours) {
-        toast.warn(`พบกิจกรรมรวม ${currentHours} ชั่วโมง จากที่ต้องการ ${targetHours} ชั่วโมง`);
+      // 4. แสดงผลลัพธ์
+      if (selectedActivities.length === 0) {
+        toast.warn('ไม่พบกิจกรรมที่ยังไม่ได้ทำในช่วงเวลาที่เลือก');
+      } else if (currentHours < targetHours) {
+        toast.warn(
+          `พบกิจกรรมที่ยังไม่ได้ทำรวม ${currentHours} ชั่วโมง จากที่ต้องการ ${targetHours} ชั่วโมง`
+        );
+      } else {
+        toast.success(`พบกิจกรรมที่เหมาะสม ${selectedActivities.length} กิจกรรม รวม ${currentHours} ชั่วโมง`);
       }
 
       setTimeout(() => {
@@ -323,7 +338,7 @@ const AutoActivityModal = ({ isOpen, onClose }) => {
                               {activity.format}
                             </span>
                             <span className="flex items-center text-sm text-gray-500">
-                            <Clock className="w-4 h-4 mr-1.5 text-[#3BB77E]" />
+                              <Clock className="w-4 h-4 mr-1.5 text-[#3BB77E]" />
                               {activity.hours} ชั่วโมง
                             </span>
                           </div>
@@ -333,14 +348,19 @@ const AutoActivityModal = ({ isOpen, onClose }) => {
                   ))
                 ) : (
                   <div className="text-center py-8 bg-gray-50 rounded-lg">
-                    <p className="text-gray-500">ไม่พบกิจกรรมที่ตรงตามเงื่อนไข</p>
-                    <p className="text-sm text-gray-400 mt-1">ลองเปลี่ยนเงื่อนไขการค้นหา</p>
+                    <p className="text-gray-500">ไม่พบกิจกรรมที่ยังไม่ได้ทำตามเงื่อนไข</p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      ลองเปลี่ยนช่วงเวลาหรือรูปแบบกิจกรรม
+                    </p>
                   </div>
                 )}
               </div>
             )}
           </div>
         );
+
+      default:
+        return null;
     }
   };
 

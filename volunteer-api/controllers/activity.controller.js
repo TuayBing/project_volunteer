@@ -468,6 +468,100 @@ const getTopActivities = async (req, res) => {
   }
 };
 
+const checkUserAttempts = async (req, res) => {
+  try {
+    const { activityId } = req.params;
+    
+    if (!req.userId) {
+      return res.status(401).json({
+        success: false,
+        message: 'ไม่พบข้อมูลผู้ใช้'
+      });
+    }
+
+    // นับจำนวนครั้งที่ user นี้ทำกิจกรรมนี้ทั้งหมด (ทั้งกำลังดำเนินการและสำเร็จ)
+    const attempts = await ActivityRegistration.count({
+      where: {
+        activity_id: activityId,
+        user_id: req.userId,
+        status: {
+          [Op.in]: ['กำลังดำเนินการ', 'สำเร็จ']
+        }
+      }
+    });
+
+    const activity = await Activity.findByPk(activityId);
+    if (!activity) {
+      return res.status(404).json({
+        success: false,
+        message: 'ไม่พบกิจกรรม'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        attempts,
+        max_attempts: activity.max_attempts,
+        canRegister: attempts < activity.max_attempts
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in checkUserAttempts:', error);
+    res.status(500).json({
+      success: false,
+      message: 'เกิดข้อผิดพลาดในการตรวจสอบจำนวนครั้งที่ทำกิจกรรม'
+    });
+  }
+};
+
+const getAvailableActivities = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    // 1. หากิจกรรมที่ user เคยทำหรือกำลังทำอยู่
+    const registeredActivities = await ActivityRegistration.findAll({
+      where: {
+        user_id: userId,
+        status: {
+          [Op.in]: ['กำลังดำเนินการ', 'สำเร็จ']
+        }
+      },
+      attributes: ['activity_id']
+    });
+
+    // 2. รวบรวม ID ของกิจกรรมที่เคยทำ
+    const registeredActivityIds = registeredActivities.map(reg => reg.activity_id);
+
+    // 3. ดึงกิจกรรมที่ยังไม่เคยทำ
+    const availableActivities = await Activity.findAll({
+      where: {
+        id: {
+          [Op.notIn]: registeredActivityIds
+        }
+      },
+      include: [{
+        model: ActivityCategory,
+        as: 'ActivityCategory',
+        attributes: ['name']
+      }]
+    });
+
+    res.json({
+      success: true,
+      data: availableActivities
+    });
+
+  } catch (error) {
+    console.error('Get available activities error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'เกิดข้อผิดพลาดในการดึงข้อมูลกิจกรรม'
+    });
+  }
+};
+
 module.exports = {
   createActivity,
   getAllActivities,
@@ -475,5 +569,7 @@ module.exports = {
   deleteActivity,
   getActivityStats,
   getDashboardStats,
-  getTopActivities
+  getTopActivities,
+  checkUserAttempts,
+  getAvailableActivities
 };

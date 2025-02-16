@@ -34,6 +34,7 @@ const BoxLoginForm = () => {
      if (response.data.success) {
        localStorage.setItem('token', response.data.token);
        localStorage.setItem('user', JSON.stringify(response.data.user));
+       
        login(response.data.user, response.data.token);
        
        const userRole = response.data.user.role.toLowerCase();
@@ -43,9 +44,8 @@ const BoxLoginForm = () => {
          navigate('/');
        }
      }
-   } catch (err) {
-     console.log('Login Error:', err);
-     setError('อีเมลหรือรหัสผ่านไม่ถูกต้อง');
+   } catch (error) {
+     setError(error.message || 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
    } finally {
      setIsLoading(false);
    }
