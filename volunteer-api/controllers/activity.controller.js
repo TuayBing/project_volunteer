@@ -213,74 +213,84 @@ const deleteActivity = async (req, res) => {
   }
  };
 
-const getActivityStats = async (req, res) => {
- try {
-   const { id: activityId } = req.params;
+ const getActivityStats = async (req, res) => {
+  try {
+    const { id: activityId } = req.params;
 
-   const activity = await Activity.findByPk(activityId);
-   if (!activity) {
-     return res.status(404).json({
-       success: false,
-       message: 'ไม่พบกิจกรรม'
-     });
-   }
+    const activity = await Activity.findByPk(activityId);
+    if (!activity) {
+      return res.status(404).json({
+        success: false,
+        message: 'ไม่พบกิจกรรม'
+      });
+    }
 
-   const [[completedStats], [interestedStats]] = await Promise.all([
-     sequelize.query(
-       `SELECT 
-         s.studentId,
-         s.firstName,
-         s.lastName,
-         s.major_id,
-         ar.registered_at,
-         ar.updated_at
-       FROM activity_registrations ar
-       JOIN users u ON ar.user_id = u.id
-       JOIN student_details s ON u.id = s.user_id
-       WHERE ar.activity_id = :activityId 
-       AND ar.status = 'สำเร็จ'
-       ORDER BY ar.updated_at DESC`,
-       {
-         replacements: { activityId },
-         type: sequelize.QueryTypes.SELECT
-       }
-     ),
+    // ใช้ Sequelize แทน Raw SQL
+    const [completedStats, interestedStats] = await Promise.all([
+      ActivityRegistration.findAll({
+        where: {
+          activity_id: activityId,
+          status: 'สำเร็จ'
+        },
+        include: [{
+          model: User,
+          include: [{
+            model: StudentDetail,
+            attributes: ['studentId', 'firstName', 'lastName', 'major_id']
+          }]
+        }],
+        order: [['updated_at', 'DESC']]
+      }),
 
-     sequelize.query(
-       `SELECT 
-         s.studentId,
-         s.firstName,
-         s.lastName,
-         s.major_id,
-         ar.registered_at,
-         ar.updated_at 
-       FROM activity_registrations ar
-       JOIN users u ON ar.user_id = u.id
-       JOIN student_details s ON u.id = s.user_id
-       WHERE ar.activity_id = :activityId
-       ORDER BY ar.registered_at DESC`,
-       {
-         replacements: { activityId },
-         type: sequelize.QueryTypes.SELECT
-       }
-     )
-   ]);
+      ActivityRegistration.findAll({
+        where: {
+          activity_id: activityId
+        },
+        include: [{
+          model: User,
+          include: [{
+            model: StudentDetail,
+            attributes: ['studentId', 'firstName', 'lastName', 'major_id']
+          }]
+        }],
+        order: [['registered_at', 'DESC']]
+      })
+    ]);
 
-   res.json({
-     success: true,
-     data: {
-       completed: completedStats || [],
-       interested: interestedStats || []
-     }
-   });
+    // แปลงข้อมูลให้อยู่ในรูปแบบที่ต้องการ
+    const formattedCompletedStats = completedStats.map(stat => ({
+      studentId: stat.User.StudentDetail.studentId,
+      firstName: stat.User.StudentDetail.firstName,
+      lastName: stat.User.StudentDetail.lastName,
+      major_id: stat.User.StudentDetail.major_id,
+      registered_at: stat.registered_at,
+      updated_at: stat.updated_at
+    }));
 
- } catch (error) {
-   console.error('Error in getActivityStats:', error);
-   res.status(500).json({
-     success: false,
-     message: 'ไม่สามารถดึงข้อมูลสถิติกิจกรรมได้'
-   });
- }
+    const formattedInterestedStats = interestedStats.map(stat => ({
+      studentId: stat.User.StudentDetail.studentId,
+      firstName: stat.User.StudentDetail.firstName,
+      lastName: stat.User.StudentDetail.lastName,
+      major_id: stat.User.StudentDetail.major_id,
+      registered_at: stat.registered_at,
+      updated_at: stat.updated_at
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        completed: formattedCompletedStats,
+        interested: formattedInterestedStats
+      }
+    });
+
+  } catch (error) {
+    console.error('Error in getActivityStats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'ไม่สามารถดึงข้อมูลสถิติกิจกรรมได้'
+    });
+  }
 };
 
 const getDashboardStats = async (req, res) => {
