@@ -16,11 +16,6 @@ const ActivityCard = ({ activity, isAuthenticated }) => {
 
   const isPrepared = savedActivities.some(saved => saved.id === activity.id);
 
-  const truncateText = (text, maxLength = 80) => {
-    if (!text) return '';
-    return text.length <= maxLength ? text : text.slice(0, maxLength) + '...';
-  }; 
-
   const handlePrepare = async () => {
     if (!token) return;
   
@@ -28,25 +23,21 @@ const ActivityCard = ({ activity, isAuthenticated }) => {
       setIsSaving(true);
       setError(null);
   
-      // เช็คว่าเตรียมบันทึกไว้แล้วหรือยัง ต้องเช็คก่อน API call
       if (isPrepared) {
         setModalType('alreadyPrepared');
         setShowStatusModal(true);
         return;
       }
   
-      // เช็คกับ server ว่า user ทำกิจกรรมนี้ได้อีกไหม
       const response = await api.get(`/activities/check/${activity.id}`);
       const { attempts, max_attempts, canRegister } = response.data.data;
   
-      // ถ้าทำครบแล้ว
       if (!canRegister) {
         setModalType('maxAttemptsReached');
         setShowStatusModal(true);
         return;
       }
   
-      // ถ้ายังไม่เคยบันทึก และยังทำได้
       saveActivity({
         id: activity.id,
         name: activity.name,
@@ -80,6 +71,7 @@ const ActivityCard = ({ activity, isAuthenticated }) => {
       setIsSaving(false);
     }
   };
+
   return (
     <>
       <div
@@ -87,7 +79,6 @@ const ActivityCard = ({ activity, isAuthenticated }) => {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* ส่วนแสดงรูปภาพ */}
         <div className="relative overflow-hidden h-[120px] sm:h-[130px] md:h-[140px]">
           <img
             src={activity.image_url || "/api/placeholder/420/126"}
@@ -108,16 +99,14 @@ const ActivityCard = ({ activity, isAuthenticated }) => {
           </div>
         </div>
 
-        {/* ส่วนเนื้อหา */}
         <div className="p-3 sm:p-4">
           <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-1 sm:mb-2 line-clamp-1 group-hover:text-[#3BB77E] transition-colors duration-200">
             {activity.name}
           </h3>
-          <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3 line-clamp-2">
-            {truncateText(activity.description)}
+          <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3 line-clamp-1">
+            {activity.description}
           </p>
 
-          {/* ข้อจำกัดจำนวนครั้ง */}
           <div className="text-xs text-gray-500 mb-2">
             {activity.max_attempts > 1 ? 
               `สามารถทำได้สูงสุด ${activity.max_attempts} ครั้ง` : 
@@ -131,7 +120,6 @@ const ActivityCard = ({ activity, isAuthenticated }) => {
             </div>
           )}
 
-          {/* ส่วนแสดงสถิติและปุ่มกด */}
           <div className="flex items-center justify-between gap-2 sm:gap-3 text-xs sm:text-sm">
             <div className="flex items-center gap-2 sm:gap-4">
               <div className="flex items-center gap-1 sm:gap-1.5">
@@ -193,7 +181,6 @@ const ActivityCard = ({ activity, isAuthenticated }) => {
         </div>
       </div>
 
-      {/* แสดง Modal */}
       <ActivityStatusModal 
         isOpen={showStatusModal}
         onClose={() => setShowStatusModal(false)}

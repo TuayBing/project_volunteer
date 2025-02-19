@@ -4,6 +4,12 @@ const { Activity, ActivityCategory } = require('../models/associations');
 const ActivityRegistration = require('../models/activity-registration.model');
 const ActivityInteraction = require('../models/activity_interaction.model');
 const PlanActivity = require('../models/planactivity.model');
+const { 
+  User: UserWithAssoc, 
+  StudentDetail: StudentDetailWithAssoc,
+  ActivityRegistration: ActivityRegistrationWithAssoc
+} = require('../models/associationsfile');
+
 const { createActivityNotification } = require('./notification.controller'); 
 const config = require('../config/config');
 
@@ -216,7 +222,6 @@ const deleteActivity = async (req, res) => {
  const getActivityStats = async (req, res) => {
   try {
     const { id: activityId } = req.params;
-
     const activity = await Activity.findByPk(activityId);
     if (!activity) {
       return res.status(404).json({
@@ -225,31 +230,34 @@ const deleteActivity = async (req, res) => {
       });
     }
 
-    // ใช้ Sequelize แทน Raw SQL
+    // ใช้ model ที่มี associations
     const [completedStats, interestedStats] = await Promise.all([
-      ActivityRegistration.findAll({
+      ActivityRegistrationWithAssoc.findAll({
         where: {
           activity_id: activityId,
           status: 'สำเร็จ'
         },
         include: [{
-          model: User,
+          model: UserWithAssoc,
+          as: 'User',
           include: [{
-            model: StudentDetail,
+            model: StudentDetailWithAssoc,
+            as: 'StudentDetails',
             attributes: ['studentId', 'firstName', 'lastName', 'major_id']
           }]
         }],
         order: [['updated_at', 'DESC']]
       }),
-
-      ActivityRegistration.findAll({
+      ActivityRegistrationWithAssoc.findAll({
         where: {
           activity_id: activityId
         },
         include: [{
-          model: User,
+          model: UserWithAssoc,
+          as: 'User',
           include: [{
-            model: StudentDetail,
+            model: StudentDetailWithAssoc,
+            as: 'StudentDetails',
             attributes: ['studentId', 'firstName', 'lastName', 'major_id']
           }]
         }],
@@ -257,21 +265,21 @@ const deleteActivity = async (req, res) => {
       })
     ]);
 
-    // แปลงข้อมูลให้อยู่ในรูปแบบที่ต้องการ
+    // แปลงข้อมูล
     const formattedCompletedStats = completedStats.map(stat => ({
-      studentId: stat.User.StudentDetail.studentId,
-      firstName: stat.User.StudentDetail.firstName,
-      lastName: stat.User.StudentDetail.lastName,
-      major_id: stat.User.StudentDetail.major_id,
+      studentId: stat.User.StudentDetails.studentId,
+      firstName: stat.User.StudentDetails.firstName,
+      lastName: stat.User.StudentDetails.lastName,
+      major_id: stat.User.StudentDetails.major_id,
       registered_at: stat.registered_at,
       updated_at: stat.updated_at
     }));
 
     const formattedInterestedStats = interestedStats.map(stat => ({
-      studentId: stat.User.StudentDetail.studentId,
-      firstName: stat.User.StudentDetail.firstName,
-      lastName: stat.User.StudentDetail.lastName,
-      major_id: stat.User.StudentDetail.major_id,
+      studentId: stat.User.StudentDetails.studentId,
+      firstName: stat.User.StudentDetails.firstName,
+      lastName: stat.User.StudentDetails.lastName,
+      major_id: stat.User.StudentDetails.major_id,
       registered_at: stat.registered_at,
       updated_at: stat.updated_at
     }));
@@ -582,4 +590,4 @@ module.exports = {
   getTopActivities,
   checkUserAttempts,
   getAvailableActivities
-};
+}; 

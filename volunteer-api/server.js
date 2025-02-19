@@ -58,7 +58,7 @@ app.use(cookieParser());
 // Rate limiting
 const limiter = rateLimit({
  windowMs: 100 * 60 * 1000,
- max: 1000,
+ max: 1200,
  message: {
    success: false,
    message: 'คำขอมากเกินไป กรุณาลองใหม่ในภายหลัง'
@@ -76,11 +76,12 @@ app.use(cors({
 }));
 
 // Body parser
-app.use(express.json({ limit: '10kb' }));
-app.use(express.urlencoded({ extended: true, limit: '10kb' }));
+app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Initialize models and associations
 require('./models/associations');
+require('./models/associationsfile');
 
 // Static folders
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -96,7 +97,7 @@ app.use('/api', activityRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/', planactivityRoutes);
 app.use('/api/notifications', notificationRoutes);
-app.use('/api/contact', contactRoutes);
+app.use('/api/', contactRoutes);
 
 // ตั้งค่าโฟลเดอร์สำหรับไฟล์
 const setupUploadDirectories = () => {
