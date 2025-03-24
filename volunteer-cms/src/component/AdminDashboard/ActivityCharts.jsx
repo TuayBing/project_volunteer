@@ -51,7 +51,7 @@ const ActivityCharts = () => {
          {
            title: "กิจกรรมในเดือนนี้",
            value: stats[2].value,
-           subValue: stats[2].subValue,
+          //  subValue: stats[2].subValue,
            icon: Calendar,
            color: "purple"
          },

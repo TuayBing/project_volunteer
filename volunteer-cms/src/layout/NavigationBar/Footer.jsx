@@ -38,8 +38,8 @@ function Footer() {
          <div className="col-span-1">
            <h3 className="font-semibold text-gray-900 mb-4">ติดต่อเรา</h3>
            <ul className="space-y-2">
-             <li className="text-gray-600">supachai.rnk@email.com</li>
-             <li className="text-gray-600">+090-235-0327</li>
+             <li className="text-gray-600">คณะวิทยาศาสตร์และเทคโนโลยี มหาวิทยาลัยเทคโนโลยีราชมงคลธัญบุรี</li>
+             <li className="text-gray-600">0-2549-4168</li>
            </ul>
          </div>
        </div>

@@ -28,7 +28,7 @@ export const AuthProvider = ({ children }) => {
     }
   }, []);
 
-  // auto logout effect 
+  // auto logout effect
   useEffect(() => {
     let inactivityTimer;
     const resetTimer = () => {
@@ -50,11 +50,6 @@ export const AuthProvider = ({ children }) => {
       document.addEventListener(event, handleActivity);
     });
 
-    const handleUnload = () => {
-      logout();
-    };
-    
-    window.addEventListener('beforeunload', handleUnload);
     resetTimer();
 
     return () => {
@@ -62,11 +57,10 @@ export const AuthProvider = ({ children }) => {
       events.forEach(event => {
         document.removeEventListener(event, handleActivity);
       });
-      window.removeEventListener('beforeunload', handleUnload);
     };
   }, [token]);
 
-  // localStorage effects 
+  // localStorage effects
   useEffect(() => {
     if (token && isValidToken(token)) {
       localStorage.setItem('token', token);
@@ -90,13 +84,12 @@ export const AuthProvider = ({ children }) => {
     // Save to localStorage first
     localStorage.setItem('token', userToken);
     localStorage.setItem('user', JSON.stringify(userData));
-    
     // Then update state
     setUser(userData);
     setToken(userToken);
   };
 
-  // logout function 
+  // logout function
   const logout = async () => {
     try {
       localStorage.removeItem('token');

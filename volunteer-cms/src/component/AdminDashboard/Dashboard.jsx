@@ -20,13 +20,13 @@ const Dashboard = () => {
 
       {/* Charts Section - Responsive */}
       <div className="flex flex-col lg:flex-row gap-6 mb-8">
-        <div className="w-full lg:w-2/5"> {/* Full width on mobile, 40% on desktop */}
-          <div className="h-full"> {/* Ensure full height for the card */}
+        <div className="w-full lg:w-2/5"> 
+          <div className="h-full"> 
             <StudentLoanStats />
           </div>
         </div>
-        <div className="w-full lg:w-3/5"> {/* Full width on mobile, 60% on desktop */}
-          <div className="h-full"> {/* Ensure full height for the card */}
+        <div className="w-full lg:w-3/5"> 
+          <div className="h-full"> 
             <FacultyLoanStats />
           </div>
         </div>

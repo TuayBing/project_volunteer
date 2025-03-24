@@ -75,9 +75,9 @@ const ActivityCompletionStats = () => {
               top: 10,
               right: 30,
               left: 20,
-              bottom: 100 // เพิ่ม margin ด้านล่างให้มากขึ้น
+              bottom: 100 
             }}
-            barGap={10} // เพิ่มระยะห่างระหว่างแท่ง
+            barGap={10} 
           >
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis
@@ -85,9 +85,9 @@ const ActivityCompletionStats = () => {
               angle={-45}
               textAnchor="end"
               interval={0}
-              height={100} // เพิ่มความสูงของพื้นที่แสดง label
-              tick={{ fontSize: 11 }} // ลดขนาดตัวอักษร
-              tickMargin={30} // เพิ่มระยะห่างระหว่าง label กับแกน
+              height={100} 
+              tick={{ fontSize: 11 }} 
+              tickMargin={30} // 
             />
             <YAxis 
               tick={{ fontSize: 12 }} 
@@ -97,7 +97,7 @@ const ActivityCompletionStats = () => {
             />
             <Tooltip content={<CustomTooltip />} />
             <Legend
-              wrapperStyle={{ paddingTop: "20px" }}
+              wrapperStyle={{ paddingTop: "50px" }}
               formatter={(value) => {
                 return value === 'interested' ? 'ผู้สนใจเข้าร่วม' : 'ผู้เข้าร่วมสำเร็จ';
               }}

@@ -43,14 +43,14 @@ function UserOverview() {
               <Users className="w-6 h-6 text-blue-600" />
             </div>
           </div>
-          <div className="mt-4 flex items-center text-sm">
+          {/* <div className="mt-4 flex items-center text-sm">
             <span className={`${
               stats.percentageChange >= 0 ? 'text-green-500' : 'text-red-500'
             } mr-2`}>
               {stats.percentageChange >= 0 ? '↑' : '↓'} {Math.abs(stats.percentageChange)}%
             </span>
             <span className="text-gray-500">จากเดือนที่แล้ว</span>
-          </div>
+          </div> */}
         </div>
 
         {/* New Users Card */}

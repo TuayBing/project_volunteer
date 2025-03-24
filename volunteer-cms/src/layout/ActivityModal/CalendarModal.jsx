@@ -114,7 +114,7 @@ const CalendarModal = ({ isOpen, onClose, activities }) => {
                   {/* Activity Details */}
                   <div className="flex-1">
                     <div className="flex items-start justify-between">
-                      <h3 className="font-bold text-gray-800 group-hover:text-[#3BB77E] transition-colors">
+                      <h3 className="font-bold text-gray-800 group-hover:text-[#3BB77E] transition-colors line-clamp-1 max-w-[300px]">
                         {activity.name}
                       </h3>
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -127,7 +127,7 @@ const CalendarModal = ({ isOpen, onClose, activities }) => {
                     </div>
                     
                     {/* Description */}
-                    <p className="mt-1 text-sm text-gray-600 line-clamp-2">
+                    <p className="mt-1 text-sm text-gray-600 line-clamp-1 max-w-[400px]">
                       {activity.description}
                     </p>
 
